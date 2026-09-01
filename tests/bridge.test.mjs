@@ -228,7 +228,7 @@ test("model and effort reach the provider command line", async () => {
   }
 });
 
-test("a timeout is terminal and the job stops running", async () => {
+test("a timeout is terminal and the job stops running", { timeout: 25_000 }, async () => {
   const directory = await repositoryWithChange();
   const { parsed } = await runBridge(
     "grok",
@@ -239,7 +239,7 @@ test("a timeout is terminal and the job stops running", async () => {
   assert.equal(parsed.completed, false);
 });
 
-test("a background job exposes status, result and per-repository scoping", async () => {
+test("a background job exposes status, result and per-repository scoping", { timeout: 30_000 }, async () => {
   const directory = await repositoryWithChange();
   const home = await scratch("bg-state");
   const started = await runBridge(
@@ -278,7 +278,7 @@ test("a background job exposes status, result and per-repository scoping", async
   assert.match(markdown.stdout, /\| job \| status \| verdict \|/);
 });
 
-test("cancel is terminal and idempotent", async () => {
+test("cancel is terminal and idempotent", { timeout: 20_000 }, async () => {
   const directory = await repositoryWithChange();
   const home = await scratch("cancel-state");
   const started = await runBridge(
@@ -380,7 +380,7 @@ test("setup reports real installation and authentication state", async () => {
   assert.match(parsed.note, /never stores provider credentials/);
 });
 
-test("unified runs dashboard aggregates background jobs across connectors in markdown and json", async () => {
+test("unified runs dashboard aggregates background jobs across connectors in markdown and json", { timeout: 30_000 }, async () => {
   const directory = await repositoryWithChange();
   const home = await scratch("unified-runs-state");
 
@@ -504,7 +504,7 @@ for (const connector of ["codex", "claude", "grok", "agy", "copilot"]) {
   });
 }
 
-test("adversarial-review and rescue support background execution and result retrieval", async () => {
+test("adversarial-review and rescue support background execution and result retrieval", { timeout: 30_000 }, async () => {
   const directory = await repositoryWithChange();
   const home = await scratch("bg-adv-rescue");
 
