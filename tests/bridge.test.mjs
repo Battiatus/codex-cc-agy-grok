@@ -562,6 +562,29 @@ test("adversarial-review and rescue support background execution and result retr
   assert.ok(rescueResult.rollbackRef);
 });
 
+test("live output streaming (--stream) pipes chunks to stdout and stderr while returning valid schema result", async () => {
+  const directory = await repositoryWithChange();
+  const home = await scratch("stream-state");
+  const result = await runBridge(
+    "codex",
+    ["review", "--cwd", directory, "--stream", "--timeout", "60s"],
+    { home, env: { MOCK_FS_WARNING: "1" } },
+  );
+
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /thread\.started/);
+  assert.match(result.stdout, /codex-thread-1/);
+  assert.match(result.stderr, /permission denied while opening provider cache/);
+
+  const jobs = await readdir(join(home, "codex", "jobs"));
+  const stored = await runBridge("codex", ["result", jobs[0]], { home });
+  assert.equal(stored.parsed.status, "COMPLETED");
+  assert.equal(stored.parsed.completed, true);
+  assert.equal(stored.parsed.verdict, "needs-attention");
+  assert.deepEqual(stored.parsed.schemaErrors, []);
+  assert.match(result.stdout, /"status":\s*"COMPLETED"/);
+});
+
 test("every connector ships an identical bridge and library tree", async () => {
   const reference = await readFile(join(repositoryRoot, "src", "bridge.mjs"), "utf8");
   const libraryNames = (await readdir(join(repositoryRoot, "src", "lib"))).sort();

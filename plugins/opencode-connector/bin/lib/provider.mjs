@@ -97,10 +97,16 @@ async function runTarget({ config, request, paths, executionCwd, prompt, schema,
   });
 
   child.stdout.on("data", (chunk) => {
+    if (request.stream) {
+      process.stdout.write(chunk);
+    }
     stdoutFile.write(chunk);
     stdout.push(chunk);
   });
   child.stderr.on("data", (chunk) => {
+    if (request.stream) {
+      process.stderr.write(chunk);
+    }
     stderrFile.write(chunk);
     stderr.push(chunk);
   });

@@ -98,6 +98,7 @@ function normalizeRequest(config, options, { defaultSchema = null, promptOverrid
     sourceCommit: head(cwd),
     mode,
     isolate: Boolean(options.isolate),
+    stream: Boolean(options.stream),
     scope: requireEnum("scope", options.scope, REVIEW_SCOPES, "auto"),
     base: options.base ?? null,
     commit: options.commit ?? null,
