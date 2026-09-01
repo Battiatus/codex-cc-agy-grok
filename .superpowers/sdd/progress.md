@@ -7,5 +7,5 @@ Started: 2026-09-01
 - [x] Task 2: Live Output Streaming Engine in `provider.mjs`
 - [x] Task 3: Robust Parsing & Noise Toleration in `parse.mjs` (5521f76)
 - [x] Task 4: Test Suite Harmonization for Node.js and Bun on Windows (543d976)
-- [ ] Task 5: Real CLI E2E Hardening & Diagnostics
+- [x] Task 5: Real CLI E2E Hardening & Diagnostics (7bd3e4b)
 - [ ] Task 6: Rebuilding All 7 Connector Plugins & Cross-Host Validation
