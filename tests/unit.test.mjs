@@ -6,7 +6,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { parseArgs, parseDuration } from "../src/lib/args.mjs";
-import { createCapture, parseProviderOutput } from "../src/lib/parse.mjs";
+import { createCapture, lastJsonObject, parseProviderOutput, stripAnsi } from "../src/lib/parse.mjs";
 import { interpretVerdict, loadSchema, validate } from "../src/lib/schema.mjs";
 import { buildInvocationArgs, composePrompt } from "../src/lib/invocation.mjs";
 import { diffText, resolveScope } from "../src/lib/git.mjs";
@@ -604,3 +604,78 @@ test("renderRunsDashboard formats a valid Markdown table and sanitizes prompt pr
   // Empty state rendering
   assert.equal(renderRunsDashboard([]), "No runs recorded across connectors.");
 });
+
+test("stripAnsi removes ANSI escape color sequences and formatting", () => {
+  assert.equal(stripAnsi("\u001b[32mhello\u001b[0m"), "hello");
+  assert.equal(stripAnsi("\u001b[1;31mERROR:\u001b[0m details \u001b[34m[info]\u001b[0m"), "ERROR: details [info]");
+  assert.equal(stripAnsi("plain text"), "plain text");
+  assert.equal(stripAnsi(null), null);
+  assert.equal(stripAnsi(undefined), undefined);
+});
+
+test("lastJsonObject extracts JSON containing ANSI escape color sequences", () => {
+  const payload = { verdict: "approve", summary: "clean", findings: [], next_steps: [] };
+  const raw = `\u001b[32m${JSON.stringify(payload)}\u001b[0m`;
+  assert.deepEqual(lastJsonObject(raw), payload);
+
+  const rawWithLogs = `\u001b[34m[INFO] Starting analysis...\u001b[0m\n\u001b[32m${JSON.stringify(payload)}\u001b[0m\n\u001b[90mDone\u001b[0m`;
+  assert.deepEqual(lastJsonObject(rawWithLogs), payload);
+});
+
+test("lastJsonObject extracts JSON enclosed in markdown code fences", () => {
+  const payload = { verdict: "approve", summary: "clean code", findings: [], next_steps: [] };
+
+  const fencedJson = "Here is the result:\n```json\n" + JSON.stringify(payload, null, 2) + "\n```\nHope this helps!";
+  assert.deepEqual(lastJsonObject(fencedJson), payload);
+
+  const fencedGeneric = "Analysis completed:\n```\n" + JSON.stringify(payload, null, 2) + "\n```\n";
+  assert.deepEqual(lastJsonObject(fencedGeneric), payload);
+
+  const multipleBlocks = "```javascript\nconst a = 1;\n```\n```json\n" + JSON.stringify(payload) + "\n```";
+  assert.deepEqual(lastJsonObject(multipleBlocks), payload);
+});
+
+test("lastJsonObject extracts JSON surrounded by conversational text before and after", () => {
+  const payload = { verdict: "needs-attention", summary: "found bugs", findings: [{ title: "x" }], next_steps: ["fix"] };
+  const conversational = `I have completed the code review of the uncommitted changes.
+
+${JSON.stringify(payload, null, 2)}
+
+Please let me know if you would like me to fix these issues.`;
+  assert.deepEqual(lastJsonObject(conversational), payload);
+
+  const inlineConversational = `Result: {"verdict":"approve","summary":"ok","findings":[],"next_steps":[]} - End of output.`;
+  assert.deepEqual(lastJsonObject(inlineConversational), { verdict: "approve", summary: "ok", findings: [], next_steps: [] });
+});
+
+test("parseProviderOutput recovers structured JSON from ANSI, markdown fences and chatter", () => {
+  const payload = { verdict: "approve", summary: "looks great", findings: [], next_steps: [] };
+
+  // Codex with markdown fence in finalMessage and ANSI in stdout
+  const codexOut = "\u001b[32m" + JSON.stringify({ type: "turn.completed", usage: { input_tokens: 10, output_tokens: 5 } }) + "\u001b[0m";
+  const codexFinal = "Here is the review result:\n```json\n" + JSON.stringify(payload) + "\n```\nThank you!";
+  const codex = parseProviderOutput("codex", { stdout: codexOut, finalMessage: codexFinal });
+  assert.deepEqual(codex.structured, payload);
+  assert.ok(!codex.text.includes("\u001b"));
+
+  // Claude with conversational text in result
+  const claude = parseProviderOutput("claude", {
+    stdout: JSON.stringify({
+      session_id: "c-1",
+      result: `Reviewed the diff.\n${JSON.stringify(payload)}\nAll checks passed.`,
+      structured_output: null,
+    }),
+  });
+  assert.deepEqual(claude.structured, payload);
+
+  // Grok with ANSI in text response
+  const grok = parseProviderOutput("grok", {
+    stdout: JSON.stringify({
+      sessionId: "g-1",
+      text: `\u001b[1m\u001b[32m${JSON.stringify(payload)}\u001b[0m`,
+      structuredOutput: null,
+    }),
+  });
+  assert.deepEqual(grok.structured, payload);
+});
+

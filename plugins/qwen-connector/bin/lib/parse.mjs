@@ -69,32 +69,132 @@ function firstString(...values) {
   return "";
 }
 
-function lastJsonObject(text) {
-  const trimmed = (text || "").trim();
-  if (!trimmed) return null;
+export function stripAnsi(text) {
+  if (typeof text !== "string") return text;
+  return text.replace(
+    /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g,
+    "",
+  );
+}
+
+function extractMarkdownBlocks(text) {
+  const blocks = [];
+  const fenceRegex = /(?:```|~~~)(?:[a-zA-Z0-9_-]+)?\s*\r?\n?([\s\S]*?)\r?\n?(?:```|~~~)/g;
+  let match;
+  while ((match = fenceRegex.exec(text)) !== null) {
+    const content = match[1].trim();
+    if (content) blocks.push(content);
+  }
+  return blocks;
+}
+
+function findLastBalancedJsonObject(text) {
+  const candidates = [];
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] !== "{") continue;
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    let matchedEnd = -1;
+
+    for (let j = i; j < text.length; j++) {
+      const ch = text[j];
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (ch === "\\" && inString) {
+        escaped = true;
+        continue;
+      }
+      if (ch === '"') {
+        inString = !inString;
+        continue;
+      }
+      if (!inString) {
+        if (ch === "{") {
+          depth++;
+        } else if (ch === "}") {
+          depth--;
+          if (depth === 0) {
+            matchedEnd = j;
+            break;
+          }
+        }
+      }
+    }
+
+    if (matchedEnd !== -1) {
+      const chunk = text.slice(i, matchedEnd + 1);
+      try {
+        const parsed = JSON.parse(chunk);
+        if (parsed && typeof parsed === "object") {
+          candidates.push(parsed);
+          i = matchedEnd;
+        }
+      } catch {
+        // Not valid JSON at this boundary
+      }
+    }
+  }
+  return candidates.length > 0 ? candidates[candidates.length - 1] : null;
+}
+
+export function lastJsonObject(text) {
+  const clean = stripAnsi(text || "").trim();
+  if (!clean) return null;
+
+  // 1. Direct JSON.parse
   try {
-    const parsed = JSON.parse(trimmed);
+    const parsed = JSON.parse(clean);
     if (parsed && typeof parsed === "object") return parsed;
   } catch {
-    // Providers may prepend log lines; fall back to the last parseable line.
+    // Continue
   }
-  const lines = trimmed.split(/\r?\n/);
+
+  // 2. Markdown fenced code blocks (from last to first)
+  const blocks = extractMarkdownBlocks(clean);
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    const block = blocks[i];
+    try {
+      const parsed = JSON.parse(block);
+      if (parsed && typeof parsed === "object") return parsed;
+    } catch {
+      const candidate = findLastBalancedJsonObject(block);
+      if (candidate) return candidate;
+    }
+  }
+
+  // 3. Line-by-line from end to start
+  const lines = clean.split(/\r?\n/);
   for (let index = lines.length - 1; index >= 0; index -= 1) {
     const line = lines[index].trim();
     if (!line.startsWith("{")) continue;
     try {
-      return JSON.parse(line);
+      const parsed = JSON.parse(line);
+      if (parsed && typeof parsed === "object") return parsed;
     } catch {
       continue;
     }
   }
-  const start = trimmed.indexOf("{");
-  if (start === -1) return null;
-  try {
-    return JSON.parse(trimmed.slice(start));
-  } catch {
-    return null;
+
+  // 4. Balanced { ... } extractor across entire clean text
+  const balanced = findLastBalancedJsonObject(clean);
+  if (balanced) return balanced;
+
+  // 5. Fallback: substring starting with '{' and ending with '}'
+  const start = clean.indexOf("{");
+  const end = clean.lastIndexOf("}");
+  if (start !== -1 && end > start) {
+    try {
+      const parsed = JSON.parse(clean.slice(start, end + 1));
+      if (parsed && typeof parsed === "object") return parsed;
+    } catch {
+      // Fallback failed
+    }
   }
+
+  return null;
 }
 
 function normalizeUsage(usage) {
@@ -185,7 +285,7 @@ function parseCodexStream(stdout, finalMessage) {
   let providerError = null;
   const notices = [];
   const denials = [];
-  for (const line of stdout.split(/\r?\n/)) {
+  for (const line of stripAnsi(stdout || "").split(/\r?\n/)) {
     const trimmed = line.trim();
     if (!trimmed.startsWith("{")) continue;
     let event;
@@ -241,7 +341,7 @@ export function parseProviderOutput(adapterName, { stdout = "", finalMessage = "
   if (!parsed) {
     return {
       adapter: adapterName,
-      text: (finalMessage || "").trim(),
+      text: stripAnsi(finalMessage || "").trim(),
       structured: null,
       nativeSessionId: null,
       usage: null,
@@ -260,6 +360,6 @@ export function parseProviderOutput(adapterName, { stdout = "", finalMessage = "
     const recovered = lastJsonObject(parsed.text);
     if (recovered && !Array.isArray(recovered)) parsed.structured = recovered;
   }
-  parsed.text = (parsed.text || "").trim();
+  parsed.text = stripAnsi(parsed.text || "").trim();
   return parsed;
 }
