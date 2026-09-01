@@ -1,0 +1,16 @@
+{
+  "name": "grok-connector",
+  "version": "0.3.0",
+  "description": "Delegate bounded, git-scoped review and coding tasks to the local Grok Build CLI from Codex, Claude Code, Grok Build, or Antigravity.",
+  "author": {
+    "name": "Polyglot Connectors contributors"
+  },
+  "license": "MIT",
+  "keywords": [
+    "agent",
+    "delegation",
+    "grok",
+    "cross-host",
+    "code-review"
+  ]
+}

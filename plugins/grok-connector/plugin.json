@@ -1,0 +1,5 @@
+{
+  "$schema": "https://antigravity.google/schemas/v1/plugin.json",
+  "name": "grok-connector",
+  "description": "Delegate bounded, git-scoped review and coding tasks to the local Grok Build CLI from Codex, Claude Code, Grok Build, or Antigravity."
+}

@@ -1,0 +1,92 @@
+{
+  "name": "polyglot-agent-connectors",
+  "interface": {
+    "displayName": "Polyglot Agent Connectors"
+  },
+  "plugins": [
+    {
+      "name": "codex-connector",
+      "source": {
+        "source": "local",
+        "path": "./plugins/codex-connector"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_USE"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "grok-connector",
+      "source": {
+        "source": "local",
+        "path": "./plugins/grok-connector"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_USE"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "agy-connector",
+      "source": {
+        "source": "local",
+        "path": "./plugins/agy-connector"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_USE"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "claude-connector",
+      "source": {
+        "source": "local",
+        "path": "./plugins/claude-connector"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_USE"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "qwen-connector",
+      "source": {
+        "source": "local",
+        "path": "./plugins/qwen-connector"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_USE"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "opencode-connector",
+      "source": {
+        "source": "local",
+        "path": "./plugins/opencode-connector"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_USE"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "copilot-connector",
+      "source": {
+        "source": "local",
+        "path": "./plugins/copilot-connector"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_USE"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

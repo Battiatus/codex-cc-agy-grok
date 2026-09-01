@@ -1,0 +1,109 @@
+{
+  "version": "0.3.0",
+  "builtFrom": [
+    "src/bridge.mjs",
+    "src/session-hook.mjs",
+    "src/lib",
+    "src/schemas"
+  ],
+  "connectors": [
+    {
+      "id": "codex",
+      "pluginName": "codex-connector",
+      "resultAdapter": "codex",
+      "capabilities": {
+        "structuredOutput": "file",
+        "model": true,
+        "effort": "config",
+        "resume": true,
+        "budgetUsd": false,
+        "finalMessageFile": true,
+        "readOnlyEnforcement": "os-sandbox"
+      }
+    },
+    {
+      "id": "grok",
+      "pluginName": "grok-connector",
+      "resultAdapter": "grok",
+      "capabilities": {
+        "structuredOutput": "inline",
+        "model": true,
+        "effort": true,
+        "resume": true,
+        "budgetUsd": false,
+        "finalMessageFile": false,
+        "readOnlyEnforcement": "tool-allowlist"
+      }
+    },
+    {
+      "id": "agy",
+      "pluginName": "agy-connector",
+      "resultAdapter": "agy",
+      "capabilities": {
+        "structuredOutput": "file",
+        "model": true,
+        "effort": true,
+        "resume": true,
+        "budgetUsd": false,
+        "finalMessageFile": false,
+        "readOnlyEnforcement": "plan-mode"
+      }
+    },
+    {
+      "id": "claude",
+      "pluginName": "claude-connector",
+      "resultAdapter": "claude",
+      "capabilities": {
+        "structuredOutput": "inline",
+        "model": true,
+        "effort": true,
+        "resume": true,
+        "budgetUsd": true,
+        "finalMessageFile": false,
+        "readOnlyEnforcement": "tool-allowlist"
+      }
+    },
+    {
+      "id": "qwen",
+      "pluginName": "qwen-connector",
+      "resultAdapter": "qwen",
+      "capabilities": {
+        "structuredOutput": "inline",
+        "model": true,
+        "effort": true,
+        "resume": true,
+        "budgetUsd": false,
+        "finalMessageFile": false,
+        "readOnlyEnforcement": "tool-allowlist"
+      }
+    },
+    {
+      "id": "opencode",
+      "pluginName": "opencode-connector",
+      "resultAdapter": "opencode",
+      "capabilities": {
+        "structuredOutput": "inline",
+        "model": true,
+        "effort": true,
+        "resume": true,
+        "budgetUsd": false,
+        "finalMessageFile": false,
+        "readOnlyEnforcement": "tool-allowlist"
+      }
+    },
+    {
+      "id": "copilot",
+      "pluginName": "copilot-connector",
+      "resultAdapter": "copilot",
+      "capabilities": {
+        "structuredOutput": "inline",
+        "model": true,
+        "effort": true,
+        "resume": true,
+        "budgetUsd": false,
+        "finalMessageFile": false,
+        "readOnlyEnforcement": "tool-allowlist"
+      }
+    }
+  ]
+}

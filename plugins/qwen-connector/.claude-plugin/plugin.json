@@ -1,0 +1,16 @@
+{
+  "name": "qwen-connector",
+  "version": "0.3.0",
+  "description": "Delegate bounded, git-scoped review and coding tasks to the local Qwen Code CLI from Codex, Claude Code, Grok Build, or Antigravity.",
+  "author": {
+    "name": "Polyglot Connectors contributors"
+  },
+  "license": "MIT",
+  "keywords": [
+    "agent",
+    "delegation",
+    "qwen",
+    "cross-host",
+    "code-review"
+  ]
+}

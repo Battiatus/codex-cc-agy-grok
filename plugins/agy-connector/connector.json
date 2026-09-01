@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 2,
+  "id": "agy",
+  "displayName": "Antigravity Connector",
+  "binary": "agy",
+  "resultAdapter": "agy",
+  "versionArgs": [
+    "--version"
+  ],
+  "helpProbes": [
+    [
+      "--help"
+    ]
+  ],
+  "knownHiddenFlags": [],
+  "authProbe": {
+    "args": [
+      "models"
+    ],
+    "successPattern": "\\S",
+    "remediation": "Start `agy` once interactively to sign in."
+  },
+  "installHint": "See https://antigravity.google/docs/cli/overview for the Antigravity CLI installer.",
+  "effortValues": [
+    "low",
+    "medium",
+    "high"
+  ],
+  "capabilities": {
+    "structuredOutput": "file",
+    "model": true,
+    "effort": true,
+    "resume": true,
+    "budgetUsd": false,
+    "finalMessageFile": false,
+    "readOnlyEnforcement": "plan-mode"
+  },
+  "invocation": {
+    "baseArgs": [
+      "-p",
+      "{prompt}",
+      "--add-dir",
+      "{cwd}",
+      "--output-format",
+      "json",
+      "--print-timeout",
+      "{providerTimeout}"
+    ],
+    "reviewArgs": [
+      "--mode",
+      "plan",
+      "--sandbox"
+    ],
+    "writeArgs": [
+      "--mode",
+      "accept-edits",
+      "--dangerously-skip-permissions"
+    ],
+    "resumeExtraArgs": [
+      "--conversation",
+      "{session}"
+    ],
+    "modelArgs": [
+      "--model",
+      "{model}"
+    ],
+    "effortArgs": [
+      "--effort",
+      "{effort}"
+    ],
+    "schemaArgs": [
+      "--json-schema",
+      "{schemaPath}"
+    ],
+    "finalMessageArgs": [],
+    "budgetArgs": [],
+    "promptArgs": []
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 2,
+  "id": "copilot",
+  "displayName": "VSCode Copilot Connector",
+  "binary": "gh",
+  "resultAdapter": "copilot",
+  "versionArgs": [
+    "copilot",
+    "--version"
+  ],
+  "helpProbes": [
+    [
+      "copilot",
+      "--help"
+    ]
+  ],
+  "knownHiddenFlags": [],
+  "authProbe": {
+    "args": [
+      "auth",
+      "status"
+    ],
+    "successPattern": "Logged in",
+    "remediation": "Run `gh auth login`."
+  },
+  "installHint": "Install GitHub CLI and Copilot extension",
+  "effortValues": [
+    "low",
+    "medium",
+    "high"
+  ],
+  "capabilities": {
+    "structuredOutput": "inline",
+    "model": true,
+    "effort": true,
+    "resume": true,
+    "budgetUsd": false,
+    "finalMessageFile": false,
+    "readOnlyEnforcement": "tool-allowlist"
+  },
+  "invocation": {
+    "baseArgs": [
+      "copilot",
+      "suggest",
+      "-p",
+      "{prompt}",
+      "--json",
+      "--cwd",
+      "{cwd}"
+    ],
+    "reviewArgs": [],
+    "writeArgs": [],
+    "resumeExtraArgs": [],
+    "modelArgs": [],
+    "effortArgs": [],
+    "schemaArgs": [
+      "--schema",
+      "{schemaInline}"
+    ],
+    "finalMessageArgs": [],
+    "budgetArgs": [],
+    "promptArgs": []
+  }
+}

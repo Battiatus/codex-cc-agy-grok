@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 2,
+  "id": "claude",
+  "displayName": "Claude Code Connector",
+  "binary": "claude",
+  "resultAdapter": "claude",
+  "versionArgs": [
+    "--version"
+  ],
+  "helpProbes": [
+    [
+      "--help"
+    ]
+  ],
+  "knownHiddenFlags": [],
+  "authProbe": {
+    "args": [
+      "auth",
+      "status"
+    ],
+    "successPattern": "\"loggedIn\"\\s*:\\s*true",
+    "remediation": "Run `claude auth login`."
+  },
+  "installHint": "See https://code.claude.com/docs for the Claude Code installer.",
+  "effortValues": [
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max"
+  ],
+  "capabilities": {
+    "structuredOutput": "inline",
+    "model": true,
+    "effort": true,
+    "resume": true,
+    "budgetUsd": true,
+    "finalMessageFile": false,
+    "readOnlyEnforcement": "tool-allowlist"
+  },
+  "invocation": {
+    "baseArgs": [
+      "-p",
+      "{prompt}",
+      "--output-format",
+      "json",
+      "--add-dir",
+      "{cwd}"
+    ],
+    "reviewArgs": [
+      "--permission-mode",
+      "dontAsk",
+      "--allowedTools",
+      "Read,Glob,Grep"
+    ],
+    "writeArgs": [
+      "--permission-mode",
+      "acceptEdits",
+      "--allowedTools",
+      "Read,Glob,Grep,Edit,Write,Bash"
+    ],
+    "resumeExtraArgs": [
+      "--resume",
+      "{session}"
+    ],
+    "modelArgs": [
+      "--model",
+      "{model}"
+    ],
+    "effortArgs": [
+      "--effort",
+      "{effort}"
+    ],
+    "schemaArgs": [
+      "--json-schema",
+      "{schemaInline}"
+    ],
+    "finalMessageArgs": [],
+    "budgetArgs": [],
+    "promptArgs": []
+  }
+}

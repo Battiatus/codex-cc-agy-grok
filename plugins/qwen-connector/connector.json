@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 2,
+  "id": "qwen",
+  "displayName": "Qwen Code Connector",
+  "binary": "qwen",
+  "resultAdapter": "qwen",
+  "versionArgs": [
+    "--version"
+  ],
+  "helpProbes": [
+    [
+      "--help"
+    ]
+  ],
+  "knownHiddenFlags": [],
+  "authProbe": {
+    "args": [
+      "auth",
+      "status"
+    ],
+    "successPattern": "loggedIn",
+    "remediation": "Run `qwen auth login`."
+  },
+  "installHint": "Install Qwen Code CLI",
+  "effortValues": [
+    "low",
+    "medium",
+    "high"
+  ],
+  "capabilities": {
+    "structuredOutput": "inline",
+    "model": true,
+    "effort": true,
+    "resume": true,
+    "budgetUsd": false,
+    "finalMessageFile": false,
+    "readOnlyEnforcement": "tool-allowlist"
+  },
+  "invocation": {
+    "baseArgs": [
+      "-p",
+      "{prompt}",
+      "--output-format",
+      "json",
+      "--cwd",
+      "{cwd}"
+    ],
+    "reviewArgs": [
+      "--allowedTools",
+      "Read,Glob,Grep"
+    ],
+    "writeArgs": [
+      "--allowedTools",
+      "Read,Glob,Grep,Edit,Write,Bash"
+    ],
+    "resumeExtraArgs": [
+      "--resume",
+      "{session}"
+    ],
+    "modelArgs": [
+      "--model",
+      "{model}"
+    ],
+    "effortArgs": [
+      "--effort",
+      "{effort}"
+    ],
+    "schemaArgs": [
+      "--json-schema",
+      "{schemaInline}"
+    ],
+    "finalMessageArgs": [],
+    "budgetArgs": [],
+    "promptArgs": []
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "mode": "parallel",
+  "runs": [
+    { "caseId": "review-readme", "attempt": 1, "passed": true, "latencyMs": 700, "tokens": 110, "costUsd": 0.11 },
+    { "caseId": "review-readme", "attempt": 2, "passed": true, "latencyMs": 700, "tokens": 110, "costUsd": 0.11 },
+    { "caseId": "review-readme", "attempt": 3, "passed": true, "latencyMs": 700, "tokens": 110, "costUsd": 0.11 },
+    { "caseId": "review-readme", "attempt": 4, "passed": true, "latencyMs": 700, "tokens": 110, "costUsd": 0.11 },
+    { "caseId": "review-readme", "attempt": 5, "passed": true, "latencyMs": 700, "tokens": 110, "costUsd": 0.11 }
+  ]
+}

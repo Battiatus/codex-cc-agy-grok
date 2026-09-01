@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "parallelism": {
+    "enabled": true,
+    "defaultMaxConcurrentSubagents": 4,
+    "activation": {
+      "requiredBenchmark": "paired-single-vs-parallel",
+      "minimumPairedAttempts": 5,
+      "minimumEfficiencyGain": 0.2,
+      "maximumRegression": 0.25,
+      "correctnessRegressionAllowed": false
+    }
+  }
+}

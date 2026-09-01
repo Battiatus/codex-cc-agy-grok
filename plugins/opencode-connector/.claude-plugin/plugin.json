@@ -1,0 +1,16 @@
+{
+  "name": "opencode-connector",
+  "version": "0.3.0",
+  "description": "Delegate bounded, git-scoped review and coding tasks to the local OpenCode CLI from Codex, Claude Code, Grok Build, or Antigravity.",
+  "author": {
+    "name": "Polyglot Connectors contributors"
+  },
+  "license": "MIT",
+  "keywords": [
+    "agent",
+    "delegation",
+    "opencode",
+    "cross-host",
+    "code-review"
+  ]
+}

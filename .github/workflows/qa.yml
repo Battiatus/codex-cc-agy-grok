@@ -1,0 +1,36 @@
+name: QA
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  qa:
+    name: qa (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Validation runs before the build so a committed artifact that no longer
+      # matches src/ fails here instead of being silently regenerated.
+      - name: Validate manifests, contracts and build freshness
+        run: npm run validate
+
+      - name: Test
+        run: npm test
+
+      - name: Rebuild and confirm the tree is unchanged
+        run: npm run build
+
+      - name: Fail on uncommitted build output
+        run: git diff --exit-code
+        shell: bash

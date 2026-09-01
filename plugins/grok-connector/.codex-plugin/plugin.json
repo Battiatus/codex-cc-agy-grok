@@ -1,0 +1,30 @@
+{
+  "name": "grok-connector",
+  "version": "0.3.0",
+  "description": "Delegate bounded, git-scoped review and coding tasks to the local Grok Build CLI from Codex, Claude Code, Grok Build, or Antigravity.",
+  "author": {
+    "name": "Polyglot Connectors contributors"
+  },
+  "license": "MIT",
+  "keywords": [
+    "agent",
+    "delegation",
+    "grok",
+    "cross-host",
+    "code-review"
+  ],
+  "interface": {
+    "displayName": "Grok Connector",
+    "shortDescription": "Delegate reviews and tasks to Grok Build.",
+    "longDescription": "Delegate bounded, git-scoped review and coding tasks to the local Grok Build CLI from Codex, Claude Code, Grok Build, or Antigravity. Review is the default mode, runs with a read-only tool profile, and returns a schema-validated verdict with findings.",
+    "developerName": "Polyglot Connectors contributors",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive"
+    ],
+    "defaultPrompt": [
+      "Ask Grok Build to review my uncommitted changes.",
+      "Delegate this diagnosis to Grok Build."
+    ]
+  }
+}

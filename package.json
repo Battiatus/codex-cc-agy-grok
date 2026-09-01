@@ -1,0 +1,18 @@
+{
+  "name": "polyglot-agent-connectors",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "description": "Cross-host connector plugins for Codex, Grok Build, Antigravity CLI, and Claude Code.",
+  "engines": {
+    "node": ">=18.18.0"
+  },
+  "scripts": {
+    "build": "node scripts/build-plugins.mjs",
+    "validate": "node scripts/validate-cross-host.mjs",
+    "test": "node --test tests/unit.test.mjs tests/bridge.test.mjs tests/benchmark-parallelism.test.mjs",
+    "test:real": "node --test tests/real-cli.test.mjs",
+    "benchmark:parallel": "node scripts/benchmark-parallelism.mjs",
+    "qa": "npm run validate && npm test"
+  }
+}

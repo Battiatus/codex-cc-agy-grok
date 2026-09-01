@@ -1,0 +1,16 @@
+{
+  "name": "copilot-connector",
+  "version": "0.3.0",
+  "description": "Delegate bounded, git-scoped review and coding tasks to the local Copilot CLI from Codex, Claude Code, Grok Build, or Antigravity.",
+  "author": {
+    "name": "Polyglot Connectors contributors"
+  },
+  "license": "MIT",
+  "keywords": [
+    "agent",
+    "delegation",
+    "copilot",
+    "cross-host",
+    "code-review"
+  ]
+}

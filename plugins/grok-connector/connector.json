@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 2,
+  "id": "grok",
+  "displayName": "Grok Connector",
+  "binary": "grok",
+  "resultAdapter": "grok",
+  "versionArgs": [
+    "--version"
+  ],
+  "helpProbes": [
+    [
+      "--help"
+    ]
+  ],
+  "knownHiddenFlags": [
+    "--no-auto-update"
+  ],
+  "authProbe": {
+    "args": [
+      "models"
+    ],
+    "successPattern": "logged in",
+    "remediation": "Run `grok login`."
+  },
+  "installHint": "See https://grok.com/build for the Grok Build CLI installer.",
+  "effortValues": [
+    "low",
+    "medium",
+    "high"
+  ],
+  "capabilities": {
+    "structuredOutput": "inline",
+    "model": true,
+    "effort": true,
+    "resume": true,
+    "budgetUsd": false,
+    "finalMessageFile": false,
+    "readOnlyEnforcement": "tool-allowlist"
+  },
+  "invocation": {
+    "baseArgs": [
+      "--no-auto-update",
+      "-p",
+      "{prompt}",
+      "--cwd",
+      "{cwd}",
+      "--output-format",
+      "json"
+    ],
+    "reviewArgs": [
+      "--permission-mode",
+      "dontAsk",
+      "--tools",
+      "read_file,list_dir,grep",
+      "--disallowed-tools",
+      "run_terminal_command,write,search_replace,spawn_subagent,search_tool,use_tool,web_search,web_fetch"
+    ],
+    "writeArgs": [
+      "--permission-mode",
+      "acceptEdits"
+    ],
+    "resumeExtraArgs": [
+      "--resume",
+      "{session}"
+    ],
+    "modelArgs": [
+      "-m",
+      "{model}"
+    ],
+    "effortArgs": [
+      "--reasoning-effort",
+      "{effort}"
+    ],
+    "schemaArgs": [
+      "--json-schema",
+      "{schemaInline}"
+    ],
+    "finalMessageArgs": [],
+    "budgetArgs": [],
+    "promptArgs": []
+  }
+}

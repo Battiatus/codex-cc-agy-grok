@@ -1,0 +1,144 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1788089570105,
+  "projectRoot": "C:\\Users\\User\\documents\\Repos\\plugins\\codex-cc-agy-grok",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": ">=18.18.0",
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      }
+    ],
+    "frameworks": [],
+    "packageManager": "npm",
+    "runtime": "Node.js 18.18.0"
+  },
+  "build": {
+    "buildCommand": "npm run build",
+    "testCommand": "npm test",
+    "lintCommand": null,
+    "devCommand": null,
+    "scripts": {
+      "build": "node scripts/build-plugins.mjs",
+      "validate": "node scripts/validate-cross-host.mjs",
+      "test": "node --test tests/unit.test.mjs tests/bridge.test.mjs tests/benchmark-parallelism.test.mjs",
+      "test:real": "node --test tests/real-cli.test.mjs",
+      "benchmark:parallel": "node scripts/benchmark-parallelism.mjs",
+      "qa": "npm run validate && npm test"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "scripts",
+      "src",
+      "tests"
+    ],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "benchmarks": {
+      "path": "benchmarks",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1788089570024,
+      "keyFiles": [
+        "parallel-policy.json"
+      ]
+    },
+    "plugins": {
+      "path": "plugins",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1788089570025,
+      "keyFiles": []
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 4,
+      "lastAccessed": 1788089570060,
+      "keyFiles": [
+        "benchmark-parallelism.mjs",
+        "build-plugins.mjs",
+        "install.mjs",
+        "validate-cross-host.mjs"
+      ]
+    },
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 2,
+      "lastAccessed": 1788089570060,
+      "keyFiles": [
+        "bridge.mjs",
+        "session-hook.mjs"
+      ]
+    },
+    "tests": {
+      "path": "tests",
+      "purpose": "Test files",
+      "fileCount": 5,
+      "lastAccessed": 1788089570061,
+      "keyFiles": [
+        "benchmark-parallelism.test.mjs",
+        "bridge.test.mjs",
+        "mock-provider.mjs",
+        "real-cli.test.mjs",
+        "unit.test.mjs"
+      ]
+    },
+    "benchmarks\\fixtures": {
+      "path": "benchmarks\\fixtures",
+      "purpose": "Test fixtures",
+      "fileCount": 3,
+      "lastAccessed": 1788089570061,
+      "keyFiles": [
+        "parallel-benefit.json",
+        "parallel-no-gain.json",
+        "single.json"
+      ]
+    },
+    "src\\lib": {
+      "path": "src\\lib",
+      "purpose": "Library code",
+      "fileCount": 12,
+      "lastAccessed": 1788089570063,
+      "keyFiles": [
+        "args.mjs",
+        "exec.mjs",
+        "git.mjs"
+      ]
+    },
+    "src\\schemas": {
+      "path": "src\\schemas",
+      "purpose": "Schema definitions",
+      "fileCount": 1,
+      "lastAccessed": 1788089570064,
+      "keyFiles": [
+        "review-output.schema.json"
+      ]
+    },
+    "tests\\fixtures": {
+      "path": "tests\\fixtures",
+      "purpose": "Test fixtures",
+      "fileCount": 0,
+      "lastAccessed": 1788089570064,
+      "keyFiles": []
+    }
+  },
+  "hotPaths": [],
+  "userDirectives": []
+}

@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 2,
+  "id": "codex",
+  "displayName": "Codex Connector",
+  "binary": "codex",
+  "resultAdapter": "codex",
+  "versionArgs": [
+    "--version"
+  ],
+  "helpProbes": [
+    [
+      "exec",
+      "--help"
+    ],
+    [
+      "exec",
+      "resume",
+      "--help"
+    ]
+  ],
+  "knownHiddenFlags": [],
+  "authProbe": {
+    "args": [
+      "login",
+      "status"
+    ],
+    "successPattern": "logged in",
+    "remediation": "Run `codex login`."
+  },
+  "installHint": "npm install -g @openai/codex",
+  "effortValues": [
+    "none",
+    "minimal",
+    "low",
+    "medium",
+    "high",
+    "xhigh"
+  ],
+  "capabilities": {
+    "structuredOutput": "file",
+    "model": true,
+    "effort": "config",
+    "resume": true,
+    "budgetUsd": false,
+    "finalMessageFile": true,
+    "readOnlyEnforcement": "os-sandbox"
+  },
+  "invocation": {
+    "baseArgs": [
+      "exec",
+      "--json",
+      "--skip-git-repo-check",
+      "-C",
+      "{cwd}",
+      "--sandbox",
+      "{sandbox}"
+    ],
+    "resumeBaseArgs": [
+      "exec",
+      "resume",
+      "--json",
+      "--skip-git-repo-check",
+      "-c",
+      "sandbox_mode=\"{sandbox}\"",
+      "{session}"
+    ],
+    "reviewArgs": [],
+    "writeArgs": [],
+    "resumeExtraArgs": [],
+    "modelArgs": [
+      "-m",
+      "{model}"
+    ],
+    "effortArgs": [
+      "-c",
+      "model_reasoning_effort=\"{effort}\""
+    ],
+    "schemaArgs": [
+      "--output-schema",
+      "{schemaPath}"
+    ],
+    "finalMessageArgs": [
+      "-o",
+      "{finalMessagePath}"
+    ],
+    "budgetArgs": [],
+    "promptArgs": [
+      "{prompt}"
+    ]
+  }
+}
