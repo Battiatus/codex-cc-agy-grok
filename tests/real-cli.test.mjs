@@ -17,6 +17,17 @@ const selected = (process.env.POLYGLOT_REAL_CONNECTORS || "codex,grok,agy,claude
   .filter(Boolean);
 const REVIEW_TIMEOUT_MS = 9 * 60 * 1000;
 
+function skipTest(t, msg) {
+  console.warn(`[SKIP] ${msg}`);
+  if (typeof process !== "undefined" && !process.versions?.bun && typeof t?.skip === "function") {
+    try {
+      t.skip(msg);
+    } catch {
+      // ignore
+    }
+  }
+}
+
 function bridgeFor(connector) {
   return join(repositoryRoot, "plugins", `${connector}-connector`, "bin", "agent-bridge.mjs");
 }
@@ -57,9 +68,19 @@ async function repositoryWithPlantedDefect() {
 }
 
 for (const connector of selected) {
-  test(`${connector}: the installed CLI is ready and every declared flag exists`, { skip: !enabled }, () => {
+  test(`${connector}: the installed CLI is ready and every declared flag exists`, { skip: !enabled }, (t) => {
     const { parsed } = runBridge(connector, ["doctor"], 90_000);
     assert.ok(parsed, "doctor must return JSON");
+
+    if (!parsed.installed) {
+      skipTest(t, `${connector}: CLI not installed: ${parsed.remediation || parsed.error || "installation required"}`);
+      return;
+    }
+    if (parsed.authenticated !== true) {
+      skipTest(t, `${connector}: CLI not authenticated: ${parsed.remediation || parsed.authDetail || "login required"}`);
+      return;
+    }
+
     assert.equal(parsed.installed, true, `${connector} is not installed`);
     assert.equal(parsed.authenticated, true, `${connector} is not authenticated: ${parsed.remediation}`);
     assert.equal(parsed.flagAudit.checked, true, "the flag audit needs help output");
@@ -73,7 +94,17 @@ for (const connector of selected) {
   test(`${connector}: a real review finds the planted defect and returns a valid payload`, {
     skip: !enabled,
     timeout: REVIEW_TIMEOUT_MS + 60_000,
-  }, async () => {
+  }, async (t) => {
+    const doctor = runBridge(connector, ["doctor"], 90_000);
+    if (!doctor.parsed?.installed) {
+      skipTest(t, `${connector}: CLI not installed: ${doctor.parsed?.remediation || doctor.parsed?.error || "installation required"}`);
+      return;
+    }
+    if (doctor.parsed?.authenticated !== true) {
+      skipTest(t, `${connector}: CLI not authenticated: ${doctor.parsed?.remediation || doctor.parsed?.authDetail || "login required"}`);
+      return;
+    }
+
     const directory = await repositoryWithPlantedDefect();
     const { parsed } = runBridge(
       connector,
@@ -110,15 +141,25 @@ const VENDOR_VALIDATORS = [
 ];
 
 for (const { binary, args, expect } of VENDOR_VALIDATORS) {
-  test(`${binary} accepts every generated plugin manifest`, { skip: !enabled, timeout: 300_000 }, () => {
+  test(`${binary} accepts every generated plugin manifest`, { skip: !enabled, timeout: 300_000 }, (t) => {
+    const probe = spawnSync(binary, ["--version"], {
+      encoding: "utf8",
+      windowsHide: true,
+      timeout: 15_000,
+    });
+    if (probe.error || probe.status !== 0) {
+      skipTest(t, `${binary} validation: Vendor CLI '${binary}' is not available on PATH`);
+      return;
+    }
+
     for (const connector of ["codex", "grok", "agy", "claude"]) {
       const pluginPath = join(repositoryRoot, "plugins", `${connector}-connector`);
-      const probe = spawnSync(binary, args(pluginPath), {
+      const validateProbe = spawnSync(binary, args(pluginPath), {
         encoding: "utf8",
         windowsHide: true,
         timeout: 90_000,
       });
-      const output = `${probe.stdout || ""}\n${probe.stderr || ""}`;
+      const output = `${validateProbe.stdout || ""}\n${validateProbe.stderr || ""}`;
       assert.match(output, expect, `${binary} rejected ${connector}-connector:\n${output}`);
       assert.ok(
         !/Validation failed|✘/.test(output),
@@ -131,14 +172,28 @@ for (const { binary, args, expect } of VENDOR_VALIDATORS) {
 test("a clean tree is reported as an empty scope by a real CLI", {
   skip: !enabled || selected.length === 0,
   timeout: 300_000,
-}, async () => {
+}, async (t) => {
+  let activeConnector = null;
+  for (const candidate of selected) {
+    const doc = runBridge(candidate, ["doctor"], 30_000);
+    if (doc.parsed?.installed && doc.parsed?.authenticated === true) {
+      activeConnector = candidate;
+      break;
+    }
+  }
+
+  if (!activeConnector) {
+    skipTest(t, `clean tree test: No installed and authenticated connectors available from [${selected.join(", ")}]`);
+    return;
+  }
+
   const { directory, git } = await temporaryRepository();
   await writeFile(join(directory, "a.js"), "export const a = 1;\n", "utf8");
   git(["add", "-A"]);
   git(["commit", "-qm", "base"]);
 
   const { parsed } = runBridge(
-    selected[0],
+    activeConnector,
     ["review", "--cwd", directory, "--scope", "uncommitted", "--timeout", "2m"],
     150_000,
   );

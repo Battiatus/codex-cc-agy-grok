@@ -15,6 +15,7 @@ import { resolveExecutable } from "../src/lib/exec.mjs";
 import { renderResult, renderRunsDashboard } from "../src/lib/render.mjs";
 import { buildHandoffDigest } from "../src/lib/transfer.mjs";
 import { listAllRuns, readJobTails } from "../src/lib/jobs.mjs";
+import { auditFlags, inspectConnector } from "../src/lib/setup.mjs";
 
 async function scratch(name) {
   return mkdtemp(join(tmpdir(), `polyglot-${name}-`));
@@ -677,5 +678,193 @@ test("parseProviderOutput recovers structured JSON from ANSI, markdown fences an
     }),
   });
   assert.deepEqual(grok.structured, payload);
+});
+
+test("inspectConnector reports missing binary with clear installation remediation and error details", () => {
+  const config = {
+    id: "fake-cli",
+    displayName: "Fake CLI Connector",
+    binary: "non-existent-binary-987654321",
+    versionArgs: ["--version"],
+    installHint: "Run `npm install -g fake-cli` to install.",
+    capabilities: { model: true },
+  };
+
+  const report = inspectConnector(config);
+  assert.equal(report.connector, "fake-cli");
+  assert.equal(report.displayName, "Fake CLI Connector");
+  assert.equal(report.binary, "non-existent-binary-987654321");
+  assert.equal(report.installed, false);
+  assert.equal(report.version, null);
+  assert.equal(report.authenticated, "unknown");
+  assert.equal(report.authDetail, null);
+  assert.equal(report.remediation, "Run `npm install -g fake-cli` to install.");
+  assert.ok(report.error.includes("non-existent-binary-987654321"));
+  assert.equal(report.capabilities.model, true);
+});
+
+test("inspectConnector with mock provider reports installed and authenticated", async () => {
+  const previousMock = process.env.AGENT_CONNECTOR_MOCK;
+  const directory = await scratch("mock-probe");
+  const mockScript = join(directory, "mock-provider.mjs");
+  await writeFile(mockScript, "console.log('mock-version 1.0.0');\n", "utf8");
+
+  try {
+    process.env.AGENT_CONNECTOR_MOCK = mockScript;
+    const config = {
+      id: "mocked",
+      displayName: "Mocked Connector",
+      binary: "mocked",
+      versionArgs: ["--version"],
+      capabilities: {},
+    };
+
+    const report = inspectConnector(config);
+    assert.equal(report.installed, true);
+    assert.equal(report.authenticated, true);
+    assert.equal(report.authDetail, "mock provider");
+    assert.equal(report.remediation, null);
+    assert.equal(report.version, "mock-version 1.0.0");
+  } finally {
+    if (previousMock !== undefined) {
+      process.env.AGENT_CONNECTOR_MOCK = previousMock;
+    } else {
+      delete process.env.AGENT_CONNECTOR_MOCK;
+    }
+  }
+});
+
+test("inspectConnector executes authProbe and validates authentication patterns", async () => {
+  const directory = await scratch("auth-probe");
+  const authScript = join(directory, "auth-tool.mjs");
+  await writeFile(
+    authScript,
+    `
+    const command = process.argv[2];
+    if (command === "auth-ok") {
+      console.log('{"loggedIn": true, "user": "test@example.com"}');
+      process.exit(0);
+    } else if (command === "auth-fail") {
+      console.log('{"loggedIn": false, "error": "session expired"}');
+      process.exit(0);
+    } else if (command === "auth-err") {
+      console.error("Authentication server unreachable");
+      process.exit(1);
+    } else {
+      console.log("tool v2.0");
+      process.exit(0);
+    }
+    `,
+    "utf8",
+  );
+
+  // 1. Success matching regex
+  const okConfig = {
+    id: "tool",
+    displayName: "Tool",
+    binary: process.execPath,
+    versionArgs: [authScript, "--version"],
+    authProbe: {
+      args: [authScript, "auth-ok"],
+      successPattern: "\"loggedIn\"\\s*:\\s*true",
+      remediation: "Run `tool login`.",
+    },
+  };
+  const okReport = inspectConnector(okConfig);
+  assert.equal(okReport.installed, true);
+  assert.equal(okReport.authenticated, true);
+  assert.equal(okReport.remediation, null);
+  assert.ok(okReport.authDetail.includes("loggedIn"));
+
+  // 2. Pattern mismatch
+  const failConfig = {
+    ...okConfig,
+    authProbe: {
+      args: [authScript, "auth-fail"],
+      successPattern: "\"loggedIn\"\\s*:\\s*true",
+      remediation: "Run `tool login`.",
+    },
+  };
+  const failReport = inspectConnector(failConfig);
+  assert.equal(failReport.installed, true);
+  assert.equal(failReport.authenticated, false);
+  assert.equal(failReport.remediation, "Run `tool login`.");
+
+  // 3. Error exit code from probe
+  const errConfig = {
+    ...okConfig,
+    authProbe: {
+      args: [authScript, "auth-err"],
+      successPattern: "\"loggedIn\"\\s*:\\s*true",
+      remediation: "Run `tool login`.",
+    },
+  };
+  const errReport = inspectConnector(errConfig);
+  assert.equal(errReport.installed, true);
+  assert.equal(errReport.authenticated, false);
+  assert.equal(errReport.remediation, "Run `tool login`.");
+  assert.ok(errReport.authDetail.includes("unreachable"));
+});
+
+test("auditFlags verifies declared flags against help probe output and respects knownHiddenFlags", async () => {
+  const directory = await scratch("audit-probe");
+  const helpScript = join(directory, "help-tool.mjs");
+  await writeFile(
+    helpScript,
+    `
+    console.log(\`
+Usage: tool [options]
+Options:
+  --prompt <text>         Input prompt
+  --cwd <path>            Working directory
+  --output-format <fmt>   Format output
+  --json                  Emit JSON
+  --version               Print version
+\`);
+    `,
+    "utf8",
+  );
+
+  // Missing binary -> unchecked
+  const missingAudit = auditFlags({
+    id: "missing",
+    binary: "non-existent-binary-9999",
+    invocation: { baseArgs: ["--prompt", "{prompt}"] },
+  });
+  assert.equal(missingAudit.checked, false);
+  assert.equal(missingAudit.ok, false);
+  assert.deepEqual(missingAudit.missing, []);
+
+  // Present binary with all flags valid
+  const okConfig = {
+    id: "tool",
+    binary: process.execPath,
+    helpProbes: [[helpScript, "--help"]],
+    invocation: {
+      baseArgs: ["--prompt", "{prompt}", "--output-format", "json"],
+      reviewArgs: ["--cwd", "{cwd}", "--json"],
+    },
+  };
+  const okAudit = auditFlags(okConfig);
+  assert.equal(okAudit.checked, true);
+  assert.equal(okAudit.ok, true);
+  assert.deepEqual(okAudit.missing, []);
+
+  // Present binary with an unrecognized flag that is not in knownHiddenFlags
+  const mismatchConfig = {
+    id: "tool",
+    binary: process.execPath,
+    helpProbes: [[helpScript, "--help"]],
+    knownHiddenFlags: ["--hidden-beta-flag"],
+    invocation: {
+      baseArgs: ["--prompt", "{prompt}", "--unsupported-option"],
+      extraArgs: ["--hidden-beta-flag"],
+    },
+  };
+  const mismatchAudit = auditFlags(mismatchConfig);
+  assert.equal(mismatchAudit.checked, true);
+  assert.equal(mismatchAudit.ok, false);
+  assert.deepEqual(mismatchAudit.missing, ["--unsupported-option"]);
+  assert.ok(!mismatchAudit.missing.includes("--hidden-beta-flag"));
 });
 

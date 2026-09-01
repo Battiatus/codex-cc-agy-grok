@@ -10,6 +10,16 @@ const LOOKUP_TIMEOUT_MS = 5_000;
 const resolutionCache = new Map();
 
 function lookupCandidates(binary) {
+  if (isAbsolute(binary) || binary.includes("/") || binary.includes("\\")) {
+    if (existsSync(binary)) return [resolve(binary)];
+    if (process.platform === "win32") {
+      for (const ext of [".exe", ".cmd", ".bat", ".ps1"]) {
+        const withExt = `${binary}${ext}`;
+        if (existsSync(withExt)) return [resolve(withExt)];
+      }
+    }
+    return [];
+  }
   const command = process.platform === "win32" ? "where.exe" : "which";
   const args = process.platform === "win32" ? [binary] : ["-a", binary];
   const result = spawnSync(command, args, {
@@ -34,11 +44,15 @@ function entrypointFromShim(shimPath) {
     return null;
   }
   const shimDirectory = dirname(shimPath);
-  const pattern = /(?:%~?dp0%?|\$basedir|\$\{basedir\})?[\\/]*([\w.@/\\-]+\.(?:js|mjs|cjs))/gi;
+  const pattern = /(?:%~?dp0%?|\$basedir|\$\{basedir\})?[\\/]*([a-zA-Z]:[\\/][\w.@/\\ -]+\.(?:exe|js|mjs|cjs)|[\w.@/\\-]+\.(?:exe|js|mjs|cjs))/gi;
   for (const match of contents.matchAll(pattern)) {
     const relative = match[1].replace(/\\/g, "/").replace(/^\.\//, "");
     const candidate = isAbsolute(relative) ? relative : resolve(shimDirectory, relative);
-    if (existsSync(candidate)) return candidate;
+    if (existsSync(candidate)) {
+      const isJs = /\.(?:js|mjs|cjs)$/i.test(candidate);
+      const isNative = /\.(?:exe)$/i.test(candidate);
+      return { path: candidate, isJs, isNative };
+    }
   }
   return null;
 }
@@ -72,22 +86,32 @@ function resolveExecutableUncached(binary) {
     return { command: native, prefixArgs: [], strategy: "native", resolvedFrom: native };
   }
 
-  // Otherwise recover the JavaScript entrypoint from a shim.
+  // Otherwise recover the JavaScript entrypoint or embedded native binary from a shim.
   for (const candidate of candidates) {
     const extension = extname(candidate).toLowerCase();
     if (extension !== ".cmd" && extension !== ".bat" && extension !== ".ps1") continue;
     const entrypoint = entrypointFromShim(candidate);
     if (entrypoint) {
-      return {
-        command: process.execPath,
-        prefixArgs: [entrypoint],
-        strategy: "shim-entrypoint",
-        resolvedFrom: candidate,
-      };
+      if (entrypoint.isJs) {
+        return {
+          command: process.execPath,
+          prefixArgs: [entrypoint.path],
+          strategy: "shim-entrypoint",
+          resolvedFrom: candidate,
+        };
+      }
+      if (entrypoint.isNative || process.platform !== "win32") {
+        return {
+          command: entrypoint.path,
+          prefixArgs: [],
+          strategy: "native",
+          resolvedFrom: candidate,
+        };
+      }
     }
   }
 
-  // Extension-less files: inspect the shebang, and on Windows try a sibling shim.
+  // Extension-less files: inspect the shebang, direct shim entrypoints, and on Windows try sibling shims.
   for (const candidate of candidates) {
     if (extname(candidate) !== "") continue;
     if (shebangInterpreter(candidate) === "node") {
@@ -98,21 +122,73 @@ function resolveExecutableUncached(binary) {
         resolvedFrom: candidate,
       };
     }
-    if (process.platform !== "win32") continue;
-    const sibling = `${candidate}.cmd`;
-    const entrypoint = existsSync(sibling) ? entrypointFromShim(sibling) : null;
-    if (entrypoint) {
+    const directShim = entrypointFromShim(candidate);
+    if (directShim) {
+      if (directShim.isJs) {
+        return {
+          command: process.execPath,
+          prefixArgs: [directShim.path],
+          strategy: "shim-entrypoint",
+          resolvedFrom: candidate,
+        };
+      }
+      if (directShim.isNative || process.platform !== "win32") {
+        return {
+          command: directShim.path,
+          prefixArgs: [],
+          strategy: "native",
+          resolvedFrom: candidate,
+        };
+      }
+    }
+    if (process.platform === "win32") {
+      for (const ext of [".cmd", ".bat"]) {
+        const sibling = `${candidate}${ext}`;
+        const entrypoint = existsSync(sibling) ? entrypointFromShim(sibling) : null;
+        if (entrypoint) {
+          if (entrypoint.isJs) {
+            return {
+              command: process.execPath,
+              prefixArgs: [entrypoint.path],
+              strategy: "sibling-shim-entrypoint",
+              resolvedFrom: sibling,
+            };
+          }
+          if (entrypoint.isNative) {
+            return {
+              command: entrypoint.path,
+              prefixArgs: [],
+              strategy: "native",
+              resolvedFrom: sibling,
+            };
+          }
+        }
+      }
+    }
+  }
+
+  // On Windows, if a .cmd/.bat candidate remains, wrap in cmd.exe
+  if (process.platform === "win32") {
+    const cmdCandidate = candidates.find((c) => {
+      const ext = extname(c).toLowerCase();
+      return ext === ".cmd" || ext === ".bat";
+    });
+    if (cmdCandidate) {
       return {
-        command: process.execPath,
-        prefixArgs: [entrypoint],
-        strategy: "sibling-shim-entrypoint",
-        resolvedFrom: sibling,
+        command: process.env.ComSpec || "cmd.exe",
+        prefixArgs: ["/d", "/s", "/c", cmdCandidate],
+        strategy: "cmd-wrapper",
+        resolvedFrom: cmdCandidate,
       };
     }
   }
 
   const first = candidates[0];
   return { command: first, prefixArgs: [], strategy: "unverified", resolvedFrom: first };
+}
+
+export function clearResolutionCache() {
+  resolutionCache.clear();
 }
 
 export function resolveExecutable(binary) {
