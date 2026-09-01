@@ -115,7 +115,7 @@
 - Consumes: `src/` code and plugin command templates
 - Produces: Synchronized plugins in `plugins/` and 0 failures in `scripts/validate-cross-host.mjs`.
 
-- [ ] **Step 1: Update command markdown templates in `scripts/build-plugins.mjs` with `--stream` flag documentation**
-- [ ] **Step 2: Run `node scripts/build-plugins.mjs` to distribute new binaries and manifests**
-- [ ] **Step 3: Run `node scripts/validate-cross-host.mjs` to verify cross-host validation 100% pass**
-- [ ] **Step 4: Run full QA suite (`npm run qa`)**
+- [x] **Step 1: Update command markdown templates in `scripts/build-plugins.mjs` with `--stream` flag documentation**
+- [x] **Step 2: Run `node scripts/build-plugins.mjs` to distribute new binaries and manifests**
+- [x] **Step 3: Run `node scripts/validate-cross-host.mjs` to verify cross-host validation 100% pass**
+- [x] **Step 4: Run full QA suite (`npm run qa`)**
