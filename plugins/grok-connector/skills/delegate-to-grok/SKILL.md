@@ -18,6 +18,7 @@ On a host that does not export `CLAUDE_PLUGIN_ROOT`, use the absolute path to th
 - `completed: true` requires a schema-valid payload whose verdict is not `could-not-review`. A zero exit code is never sufficient.
 - Nothing is copied out of the workspace by default. `--isolate` creates a detached git worktree, or outside git a copy that refuses credentials and gitignored files.
 - `write` requires `--mode write --confirm-write`, records a rollback ref and reports every changed file.
+- Real-time token and log output streaming is supported across commands with `--stream`.
 - Credentials are never read or stored; the bridge inherits the Grok Build login.
 - Delegating back through the same connector is refused, as is a chain deeper than three connectors.
 
@@ -27,9 +28,11 @@ On a host that does not export `CLAUDE_PLUGIN_ROOT`, use the absolute path to th
 node "${CLAUDE_PLUGIN_ROOT}/bin/agent-bridge.mjs" setup --format markdown
 node "${CLAUDE_PLUGIN_ROOT}/bin/agent-bridge.mjs" review --scope uncommitted --format markdown
 node "${CLAUDE_PLUGIN_ROOT}/bin/agent-bridge.mjs" review --scope branch --base main --background
+node "${CLAUDE_PLUGIN_ROOT}/bin/agent-bridge.mjs" review --scope uncommitted --stream --format markdown
 node "${CLAUDE_PLUGIN_ROOT}/bin/agent-bridge.mjs" adversarial-review --focus "security" --format markdown
 node "${CLAUDE_PLUGIN_ROOT}/bin/agent-bridge.mjs" rescue --prompt "<task>" --error "<error-log>" --format markdown
 node "${CLAUDE_PLUGIN_ROOT}/bin/agent-bridge.mjs" run --prompt "<task>" --format markdown
+node "${CLAUDE_PLUGIN_ROOT}/bin/agent-bridge.mjs" run --prompt "<task>" --stream --format markdown
 node "${CLAUDE_PLUGIN_ROOT}/bin/agent-bridge.mjs" run --prompt "<task>" --mode write --confirm-write --format markdown
 node "${CLAUDE_PLUGIN_ROOT}/bin/agent-bridge.mjs" handoff --from-host claude --prompt "<task>" --format markdown
 node "${CLAUDE_PLUGIN_ROOT}/bin/agent-bridge.mjs" resume --session "<native-session-id>" --prompt "<follow-up>"

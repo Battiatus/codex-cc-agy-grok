@@ -411,7 +411,7 @@ function commandFiles(connector) {
   return {
     "review.md": `---
 description: Run a ${name} code review of the current git scope and return a schema-validated verdict
-argument-hint: '[--scope auto|uncommitted|staged|branch|commit|workspace] [--base <ref>] [--commit <sha>] [--isolate] [--model <model>] [--effort <level>] [--background] [--timeout 10m]'
+argument-hint: '[--scope auto|uncommitted|staged|branch|commit|workspace] [--base <ref>] [--commit <sha>] [--isolate] [--model <model>] [--effort <level>] [--stream] [--background] [--timeout 10m]'
 disable-model-invocation: true
 allowed-tools: Bash(node:*), Bash(git:*), AskUserQuestion
 ---
@@ -425,6 +425,7 @@ Rules:
 - Make exactly one bridge call and present its output. Never construct provider commands yourself.
 - If the arguments include \`--background\`, launch the command with \`run_in_background: true\` and tell the user to check \`/${scoped}:status\`.
 - Otherwise run it in the foreground.
+- Pass \`--stream\` for real-time live output streaming to stdout.
 
 \`\`\`bash
 ${BRIDGE} review $ARGUMENTS --format markdown
@@ -441,7 +442,7 @@ Reading the result:
 `,
     "adversarial-review.md": `---
 description: Run an adversarial Red Team code review with ${name} focusing on security vulnerabilities, edge cases, and exploit vectors
-argument-hint: '[--focus <area>] [--scope auto|uncommitted|staged|branch|commit|workspace] [--base <ref>] [--commit <sha>] [--isolate] [--model <model>] [--effort <level>] [--background] [--timeout 10m]'
+argument-hint: '[--focus <area>] [--scope auto|uncommitted|staged|branch|commit|workspace] [--base <ref>] [--commit <sha>] [--isolate] [--model <model>] [--effort <level>] [--stream] [--background] [--timeout 10m]'
 disable-model-invocation: true
 allowed-tools: Bash(node:*), Bash(git:*), AskUserQuestion
 ---
@@ -455,6 +456,7 @@ Rules:
 - Make exactly one bridge call and present its output. Never construct provider commands yourself.
 - If the arguments include \`--background\`, launch the command with \`run_in_background: true\` and tell the user to check \`/${scoped}:status\`.
 - Otherwise run it in the foreground.
+- Pass \`--stream\` for real-time live output streaming to stdout.
 
 \`\`\`bash
 ${BRIDGE} adversarial-review $ARGUMENTS --format markdown
@@ -471,7 +473,7 @@ Reading the result:
 `,
     "rescue.md": `---
 description: Run a rescue operation with ${name} in write mode to diagnose and fix errors, failing tests, or broken builds with Git rollback tracking
-argument-hint: '[--prompt "<task>"] [--error "<error-log>"] [--test "<test-command>"] [--model <model>] [--effort <level>] [--background] [--timeout 10m]'
+argument-hint: '[--prompt "<task>"] [--error "<error-log>"] [--test "<test-command>"] [--model <model>] [--effort <level>] [--stream] [--background] [--timeout 10m]'
 allowed-tools: Bash(node:*), AskUserQuestion
 ---
 
@@ -490,6 +492,7 @@ ${BRIDGE} rescue $ARGUMENTS --format markdown
 - Report the terminal status, the verdict when present, every changed file, and the rollback reference.
 - If the rescue introduces regressions or fails, use the reported rollback reference to revert changes cleanly.
 - Never treat a zero exit code as success. Read \`status\` and \`completed\`.
+- Pass \`--stream\` for real-time live output streaming during rescue diagnosis and execution.
 `,
     "runs.md": `---
 description: Show unified runs dashboard and live supervision of agent execution jobs across connectors
@@ -504,7 +507,7 @@ Present the multi-agent runs dashboard table as returned.
 `,
     "delegate.md": `---
 description: Delegate a bounded task to ${name}, read-only by default
-argument-hint: '[--mode write --confirm-write] [--model <model>] [--effort <level>] [--background] [--timeout 10m] <task>'
+argument-hint: '[--mode write --confirm-write] [--model <model>] [--effort <level>] [--stream] [--background] [--timeout 10m] <task>'
 allowed-tools: Bash(node:*), AskUserQuestion
 ---
 
@@ -523,10 +526,11 @@ ${BRIDGE} run --prompt "<task>" $ARGUMENTS --format markdown
 
 - Report the terminal status, the verdict when present, every changed file, and the rollback reference for writes.
 - Never treat a zero exit code as success. Read \`status\` and \`completed\`.
+- Pass \`--stream\` to stream provider logs in real time.
 `,
     "handoff.md": `---
 description: Hand this conversation's context to ${name} as a derived context and continue the work there
-argument-hint: '[--from-host claude|codex|grok|agy] [--source <transcript>] [--background] <task>'
+argument-hint: '[--from-host claude|codex|grok|agy] [--source <transcript>] [--stream] [--background] <task>'
 allowed-tools: Bash(node:*)
 ---
 
@@ -542,6 +546,7 @@ Rules:
 - The SessionStart hook records the transcript path, so \`--source\` is only needed when that failed.
 - Label the outcome as a derived context transfer, never as a lossless session resume.
 - If the bridge reports that no transcript could be identified, ask the user for \`--source <path>\`.
+- Pass \`--stream\` to stream output during handoff execution.
 `,
     "status.md": `---
 description: Show ${name} jobs for this repository with enriched live status, PID, live duration, model, prompt preview, and logs
@@ -615,6 +620,7 @@ Forwarding rules:
 - Default to review mode. Add \`--mode write --confirm-write\` only when the request explicitly authorises changes to this workspace.
 - Add \`--background\` when the task is open-ended or likely to run long; otherwise run in the foreground.
 - Pass \`--format markdown\` so the output is readable.
+- Pass \`--stream\` for live output streaming when requested.
 - Leave \`--model\` and \`--effort\` unset unless the request names one.
 - Do not inspect the repository, read files, grep, poll status, fetch results, or do any work of your own.
 - Return the bridge stdout exactly as-is, with no commentary before or after it.
@@ -645,6 +651,7 @@ On a host that does not export \`CLAUDE_PLUGIN_ROOT\`, use the absolute path to 
 - \`completed: true\` requires a schema-valid payload whose verdict is not \`could-not-review\`. A zero exit code is never sufficient.
 - Nothing is copied out of the workspace by default. \`--isolate\` creates a detached git worktree, or outside git a copy that refuses credentials and gitignored files.
 - \`write\` requires \`--mode write --confirm-write\`, records a rollback ref and reports every changed file.
+- Real-time token and log output streaming is supported across commands with \`--stream\`.
 - Credentials are never read or stored; the bridge inherits the ${connector.shortName} login.
 - Delegating back through the same connector is refused, as is a chain deeper than three connectors.
 
@@ -654,9 +661,11 @@ On a host that does not export \`CLAUDE_PLUGIN_ROOT\`, use the absolute path to 
 ${BRIDGE} setup --format markdown
 ${BRIDGE} review --scope uncommitted --format markdown
 ${BRIDGE} review --scope branch --base main --background
+${BRIDGE} review --scope uncommitted --stream --format markdown
 ${BRIDGE} adversarial-review --focus "security" --format markdown
 ${BRIDGE} rescue --prompt "<task>" --error "<error-log>" --format markdown
 ${BRIDGE} run --prompt "<task>" --format markdown
+${BRIDGE} run --prompt "<task>" --stream --format markdown
 ${BRIDGE} run --prompt "<task>" --mode write --confirm-write --format markdown
 ${BRIDGE} handoff --from-host claude --prompt "<task>" --format markdown
 ${BRIDGE} resume --session "<native-session-id>" --prompt "<follow-up>"
@@ -723,7 +732,7 @@ Self-contained package: manifests for Codex, Claude Code and Antigravity, slash 
 - Structured completion: \`completed: true\` requires a schema-valid payload whose verdict is not \`could-not-review\`
 - Lifecycle: \`setup\`, \`doctor\`, \`capabilities\`, \`review\`, \`adversarial-review\`, \`rescue\`, \`runs\`, \`run\`, \`resume\`, \`handoff\`, \`status\`, \`result\`, \`cancel\`
 - Metrics: \`durationMs\`, \`usage\`${connector.capabilities.budgetUsd ? ", `costUsd`, and `--max-budget-usd`" : ", and `costUsd` when the provider reports it"}
-- Routing: \`--model\`, \`--effort\` (${connector.effortValues.join(", ")})
+- Routing: \`--model\`, \`--effort\` (${connector.effortValues.join(", ")}), \`--stream\`
 - State: \`AGENT_CONNECTOR_HOME\`, or the OS temporary directory under \`agent-connectors/${connector.id}\`
 - Authentication: inherited from the target CLI; never stored by this plugin
 

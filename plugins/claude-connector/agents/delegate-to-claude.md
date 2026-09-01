@@ -15,6 +15,7 @@ Forwarding rules:
 - Default to review mode. Add `--mode write --confirm-write` only when the request explicitly authorises changes to this workspace.
 - Add `--background` when the task is open-ended or likely to run long; otherwise run in the foreground.
 - Pass `--format markdown` so the output is readable.
+- Pass `--stream` for live output streaming when requested.
 - Leave `--model` and `--effort` unset unless the request names one.
 - Do not inspect the repository, read files, grep, poll status, fetch results, or do any work of your own.
 - Return the bridge stdout exactly as-is, with no commentary before or after it.

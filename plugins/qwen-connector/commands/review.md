@@ -1,6 +1,6 @@
 ---
 description: Run a Qwen Code code review of the current git scope and return a schema-validated verdict
-argument-hint: '[--scope auto|uncommitted|staged|branch|commit|workspace] [--base <ref>] [--commit <sha>] [--isolate] [--model <model>] [--effort <level>] [--background] [--timeout 10m]'
+argument-hint: '[--scope auto|uncommitted|staged|branch|commit|workspace] [--base <ref>] [--commit <sha>] [--isolate] [--model <model>] [--effort <level>] [--stream] [--background] [--timeout 10m]'
 disable-model-invocation: true
 allowed-tools: Bash(node:*), Bash(git:*), AskUserQuestion
 ---
@@ -14,6 +14,7 @@ Rules:
 - Make exactly one bridge call and present its output. Never construct provider commands yourself.
 - If the arguments include `--background`, launch the command with `run_in_background: true` and tell the user to check `/qwen-connector:status`.
 - Otherwise run it in the foreground.
+- Pass `--stream` for real-time live output streaming to stdout.
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/bin/agent-bridge.mjs" review $ARGUMENTS --format markdown

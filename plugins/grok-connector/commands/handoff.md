@@ -1,6 +1,6 @@
 ---
 description: Hand this conversation's context to Grok Build as a derived context and continue the work there
-argument-hint: '[--from-host claude|codex|grok|agy] [--source <transcript>] [--background] <task>'
+argument-hint: '[--from-host claude|codex|grok|agy] [--source <transcript>] [--stream] [--background] <task>'
 allowed-tools: Bash(node:*)
 ---
 
@@ -16,3 +16,4 @@ Rules:
 - The SessionStart hook records the transcript path, so `--source` is only needed when that failed.
 - Label the outcome as a derived context transfer, never as a lossless session resume.
 - If the bridge reports that no transcript could be identified, ask the user for `--source <path>`.
+- Pass `--stream` to stream output during handoff execution.

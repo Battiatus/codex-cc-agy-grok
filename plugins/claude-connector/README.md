@@ -14,7 +14,7 @@ Self-contained package: manifests for Codex, Claude Code and Antigravity, slash 
 - Structured completion: `completed: true` requires a schema-valid payload whose verdict is not `could-not-review`
 - Lifecycle: `setup`, `doctor`, `capabilities`, `review`, `adversarial-review`, `rescue`, `runs`, `run`, `resume`, `handoff`, `status`, `result`, `cancel`
 - Metrics: `durationMs`, `usage`, `costUsd`, and `--max-budget-usd`
-- Routing: `--model`, `--effort` (low, medium, high, xhigh, max)
+- Routing: `--model`, `--effort` (low, medium, high, xhigh, max), `--stream`
 - State: `AGENT_CONNECTOR_HOME`, or the OS temporary directory under `agent-connectors/claude`
 - Authentication: inherited from the target CLI; never stored by this plugin
 

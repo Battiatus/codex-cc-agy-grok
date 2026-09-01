@@ -1,6 +1,6 @@
 ---
 description: Delegate a bounded task to Qwen Code, read-only by default
-argument-hint: '[--mode write --confirm-write] [--model <model>] [--effort <level>] [--background] [--timeout 10m] <task>'
+argument-hint: '[--mode write --confirm-write] [--model <model>] [--effort <level>] [--stream] [--background] [--timeout 10m] <task>'
 allowed-tools: Bash(node:*), AskUserQuestion
 ---
 
@@ -19,3 +19,4 @@ node "${CLAUDE_PLUGIN_ROOT}/bin/agent-bridge.mjs" run --prompt "<task>" $ARGUMEN
 
 - Report the terminal status, the verdict when present, every changed file, and the rollback reference for writes.
 - Never treat a zero exit code as success. Read `status` and `completed`.
+- Pass `--stream` to stream provider logs in real time.
