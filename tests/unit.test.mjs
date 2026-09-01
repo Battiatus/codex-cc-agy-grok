@@ -57,6 +57,14 @@ test("a prompt may start with -- and inline values are supported", () => {
   assert.equal(parseArgs(["run", "--confirm-write"]).options["confirm-write"], true);
 });
 
+test("--stream flag is parsed as boolean and supports inline values", () => {
+  assert.equal(parseArgs(["run", "--stream"]).options.stream, true);
+  assert.equal(parseArgs(["run", "--stream=true"]).options.stream, true);
+  assert.equal(parseArgs(["run", "--stream=false"]).options.stream, false);
+  assert.equal(parseArgs(["run", "--stream=1"]).options.stream, true);
+  assert.equal(parseArgs(["run", "--stream=0"]).options.stream, false);
+});
+
 test("durations accept hours and reject nonsense", () => {
   assert.equal(parseDuration("1h"), 3_600_000);
   assert.equal(parseDuration("2.5m"), 150_000);

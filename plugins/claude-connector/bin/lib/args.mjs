@@ -12,6 +12,7 @@ const BOOLEAN_FLAGS = new Set([
   "isolate",
   "json",
   "reap",
+  "stream",
 ]);
 
 const VALUE_FLAGS = new Set([
