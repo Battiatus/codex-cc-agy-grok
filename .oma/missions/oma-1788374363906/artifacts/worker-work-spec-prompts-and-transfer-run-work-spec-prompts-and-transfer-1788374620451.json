@@ -1,0 +1,19 @@
+{
+  "receipt": {
+    "runId": "run-work-spec-prompts-and-transfer-1788374620451",
+    "expertId": "worker",
+    "model": "agy-default",
+    "effort": "agy-default",
+    "sandbox": "workspace-write",
+    "durationMs": 301459,
+    "exitCode": 124,
+    "status": "timed_out",
+    "stdoutHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "scrubbedStdoutHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "receiptHash": "fa06f550c44892d47c5b2f992dc19b6d7d16bb82837eb7a3ce4aad518551785a"
+  },
+  "status": "timed_out",
+  "error": "Task execution timed out by watchdog.",
+  "stdout": "",
+  "stderr": "\n[OMA ERROR: Process timed out after 300000ms]"
+}

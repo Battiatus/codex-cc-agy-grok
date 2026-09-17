@@ -1,0 +1,79 @@
+{
+  "workItems": [
+    {
+      "id": "work-audit-architecture-matrix",
+      "title": "Document architectural comparison and feature gap matrix against openai/codex-plugin-cc",
+      "scope": [
+        "docs/comparison-codex-plugin-cc.md"
+      ],
+      "dependsOn": [],
+      "persona": "worker",
+      "acceptance": [
+        "Perform a comprehensive architectural comparison between openai/codex-plugin-cc and the codex-cc-agy-grok polyglot repository.",
+        "Document the feature parity matrix covering slash commands, execution models (daemon broker vs CLI exec), isolation sandboxes, and session hooks.",
+        "Detail the architectural advantages and trade-offs of the symmetrical polyglot bridge vs the dedicated single-target companion."
+      ]
+    },
+    {
+      "id": "work-spec-stop-review-gate",
+      "title": "Specify stop-review-gate hook and session lifecycle parity with openai/codex-plugin-cc",
+      "scope": [
+        "docs/specs/stop-review-gate-parity.md"
+      ],
+      "dependsOn": [],
+      "persona": "worker",
+      "acceptance": [
+        "Analyze the stop-review-gate hook from openai/codex-plugin-cc and compare it with the repository's session hooks.",
+        "Design an actionable specification to integrate stop-review-gate capabilities across polyglot agent connectors.",
+        "Define validation criteria, trigger conditions, bypass mechanisms, and schema constraints for pre-stop review gates."
+      ]
+    },
+    {
+      "id": "work-spec-app-server-broker",
+      "title": "Evaluate Codex app-server broker daemon protocol vs batch CLI exec",
+      "scope": [
+        "docs/specs/app-server-protocol-evaluation.md"
+      ],
+      "dependsOn": [],
+      "persona": "worker",
+      "acceptance": [
+        "Evaluate the JSON-RPC app-server protocol used by openai/codex-plugin-cc against the batch CLI exec architecture.",
+        "Compare latency, persistent session management, streaming responses, and process lifecycle.",
+        "Produce a specification for an optional app-server broker adapter in src/lib/provider.mjs compatible with the polyglot connector interface."
+      ]
+    },
+    {
+      "id": "work-spec-prompts-and-transfer",
+      "title": "Map prompt engineering skills and session transfer compatibility",
+      "scope": [
+        "docs/specs/prompt-skills-and-transfer-parity.md"
+      ],
+      "dependsOn": [],
+      "persona": "worker",
+      "acceptance": [
+        "Compare upstream prompt engineering guidelines, recipes, and antipatterns with current connector prompt composition.",
+        "Analyze session context transfer (/codex:transfer) compared to handoff mechanisms in src/lib/transfer.mjs.",
+        "Define recommendations for harmonizing prompt templates and subagent skills across all connectors."
+      ]
+    },
+    {
+      "id": "work-update-project-roadmap",
+      "title": "Update PROJECT.md with comparative audit findings and upstream alignment milestones",
+      "scope": [
+        "PROJECT.md"
+      ],
+      "dependsOn": [
+        "work-audit-architecture-matrix",
+        "work-spec-stop-review-gate",
+        "work-spec-app-server-broker",
+        "work-spec-prompts-and-transfer"
+      ],
+      "persona": "worker",
+      "acceptance": [
+        "Update PROJECT.md with findings from the openai/codex-plugin-cc comparative analysis.",
+        "Add roadmap milestones for upstream feature alignment while maintaining existing polyglot parity.",
+        "Verify that repository validation and test suites continue to pass with zero failures."
+      ]
+    }
+  ]
+}

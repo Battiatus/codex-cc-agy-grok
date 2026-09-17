@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "graphId": "graph-mission-1788368162553",
+  "revision": 1,
+  "schedulerAuthorityId": "oma-scheduler",
+  "nodes": [
+    {
+      "id": "oma-bootstrap",
+      "title": "OMA bootstrap",
+      "kind": "join",
+      "activation": "all",
+      "completionAuthority": "scheduler",
+      "completionAuthorityId": "oma-scheduler"
+    }
+  ],
+  "edges": []
+}

@@ -1,0 +1,34 @@
+{
+  "receipt": {
+    "runId": "run-planner-mission-demo",
+    "expertId": "planner",
+    "model": "gemini-3.7-pro",
+    "effort": "high",
+    "sandbox": "read-only",
+    "durationMs": 5123,
+    "exitCode": 1,
+    "status": "failed",
+    "stdoutHash": "19a2dc517bf217fe2dd0ea07baa75c89228b62c57b92944244ec6de30e420bdb",
+    "scrubbedStdoutHash": "19a2dc517bf217fe2dd0ea07baa75c89228b62c57b92944244ec6de30e420bdb",
+    "receiptHash": "3c4e2716dcf4b0fe65b8ed243470d733acd399f637f1eb964124f2d32fc85233"
+  },
+  "status": "failed",
+  "error": "Process exited with non-zero code 1: Task failed",
+  "stdout": "{\"conversation_id\":\"\",\"status\":\"ERROR\",\"response\":\"\",\"error\":\"invalid model selection (--model \\\"gemini-3.7-pro\\\" --effort \\\"high\\\"): --effort is not supported for model \\\"gemini-3.7-pro\\\"\",\"duration_seconds\":0,\"num_turns\":0,\"usage\":{\"input_tokens\":0,\"output_tokens\":0,\"thinking_tokens\":0,\"cache_read_tokens\":0,\"total_tokens\":0}}\n",
+  "stderr": "",
+  "parsedOutput": {
+    "conversation_id": "",
+    "status": "ERROR",
+    "response": "",
+    "error": "invalid model selection (--model \"gemini-3.7-pro\" --effort \"high\"): --effort is not supported for model \"gemini-3.7-pro\"",
+    "duration_seconds": 0,
+    "num_turns": 0,
+    "usage": {
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "thinking_tokens": 0,
+      "cache_read_tokens": 0,
+      "total_tokens": 0
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "receipt": {
+    "runId": "run-work-audit-architecture-matrix-repair-2-repair-3-1788375236286",
+    "expertId": "fixer",
+    "model": "agy-default",
+    "effort": "agy-default",
+    "sandbox": "workspace-write",
+    "durationMs": 301405,
+    "exitCode": 124,
+    "status": "timed_out",
+    "stdoutHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "scrubbedStdoutHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "receiptHash": "1f1298127210b82cba180850fc78e2bcc65047fe93eb46b9ae34efdf70c7015b"
+  },
+  "status": "timed_out",
+  "error": "Task execution timed out by watchdog.",
+  "stdout": "",
+  "stderr": "\n[OMA ERROR: Process timed out after 300000ms]"
+}

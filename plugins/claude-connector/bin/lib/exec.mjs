@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync, existsSync } from "node:fs";
-import { dirname, extname, isAbsolute, resolve } from "node:path";
+import { basename, dirname, extname, isAbsolute, resolve } from "node:path";
 
 const LOOKUP_TIMEOUT_MS = 5_000;
 
@@ -45,14 +45,17 @@ function entrypointFromShim(shimPath) {
   }
   const shimDirectory = dirname(shimPath);
   const pattern = /(?:%~?dp0%?|\$basedir|\$\{basedir\})?[\\/]*([a-zA-Z]:[\\/][\w.@/\\ -]+\.(?:exe|js|mjs|cjs)|[\w.@/\\-]+\.(?:exe|js|mjs|cjs))/gi;
+  // Shims reference the interpreter itself (node.exe, node) before the real
+  // entrypoint; returning it yields `node.exe <args>` which silently runs the
+  // wrong program (`node --version` even looks like success). Skip runtimes.
+  const isRuntime = (candidate) => /^(?:node(?:js)?\.exe|node)$/i.test(basename(candidate));
   for (const match of contents.matchAll(pattern)) {
     const relative = match[1].replace(/\\/g, "/").replace(/^\.\//, "");
     const candidate = isAbsolute(relative) ? relative : resolve(shimDirectory, relative);
-    if (existsSync(candidate)) {
-      const isJs = /\.(?:js|mjs|cjs)$/i.test(candidate);
-      const isNative = /\.(?:exe)$/i.test(candidate);
-      return { path: candidate, isJs, isNative };
-    }
+    if (!existsSync(candidate) || isRuntime(candidate)) continue;
+    const isJs = /\.(?:js|mjs|cjs)$/i.test(candidate);
+    const isNative = /\.(?:exe)$/i.test(candidate);
+    return { path: candidate, isJs, isNative };
   }
   return null;
 }

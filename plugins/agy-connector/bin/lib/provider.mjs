@@ -9,7 +9,7 @@ import { collectGarbage, prepareExecutionRoot } from "./isolation.mjs";
 import { buildInvocationArgs, composePrompt } from "./invocation.mjs";
 import { createCapture, parseProviderOutput } from "./parse.mjs";
 import { interpretVerdict, loadSchema, validate } from "./schema.mjs";
-import { jobPaths, nowIso, readJsonOrNull, updateJob, writeJsonAtomic } from "./jobs.mjs";
+import { jobPaths, nowIso, readJobTails, readJsonOrNull, updateJob, writeJsonAtomic } from "./jobs.mjs";
 
 const MAX_CHAIN_DEPTH = 3;
 const PROVIDER_TIMEOUT_MARGIN_MS = 30_000;
@@ -74,6 +74,23 @@ async function runTarget({ config, request, paths, executionCwd, prompt, schema,
       resolvedFrom: resolve(mock),
     }
     : buildTargetCommand(config.binary, built.args);
+
+  // R3: persist the exact replay artifacts BEFORE spawning, so a failure can
+  // always be re-diagnosed: the composed prompt (with the embedded diff) and
+  // the exact command line after resolution strategy and flag expansion.
+  await writeFile(paths.promptComposed, `${prompt}\n`, "utf8").catch(() => {});
+  await writeJsonAtomic(paths.invocation, {
+    command: invocation.command,
+    args: invocation.args,
+    cwd: executionCwd,
+    strategy: invocation.strategy,
+    resolvedFrom: invocation.resolvedFrom ?? null,
+    applied: built.applied,
+    schemaPath: plan.schemaPath || null,
+    finalMessagePath: plan.finalMessagePath || null,
+    providerTimeout: plan.providerTimeout,
+    timeoutMs: request.timeoutMs,
+  }).catch(() => {});
 
   const stdoutFile = createWriteStream(paths.stdout, { flags: "a" });
   const stderrFile = createWriteStream(paths.stderr, { flags: "a" });
@@ -142,6 +159,8 @@ async function runTarget({ config, request, paths, executionCwd, prompt, schema,
     stderrTail: stderr.text().slice(-4_000),
     outputTruncated: stdout.truncated(),
     invocationStrategy: invocation.strategy,
+    invocationPath: paths.invocation,
+    promptComposedPath: paths.promptComposed,
   };
 }
 
@@ -162,10 +181,13 @@ function decideStatus({ provider, request, schemaErrors, verdict, scopeEmpty }) 
 export async function executeJob(config, request) {
   const paths = jobPaths(config.id, request.jobId);
   let isolation = null;
+  // R1: track the failing phase so the failure record says WHERE it broke.
+  let phase = "init";
   try {
     const chain = assertChainAllowed(config.id);
     await collectGarbage();
 
+    phase = "resolve-scope";
     const scope = request.mode === "review"
       ? resolveScope(request.cwd, {
         scope: request.scope,
@@ -175,6 +197,7 @@ export async function executeJob(config, request) {
       : null;
     const diff = scope ? diffText(request.cwd, scope) : "";
 
+    phase = "isolate";
     isolation = await prepareExecutionRoot({
       mode: request.mode,
       cwd: request.cwd,
@@ -182,6 +205,7 @@ export async function executeJob(config, request) {
       isolate: request.isolate,
     });
 
+    phase = "schema";
     let schema = null;
     if (request.schema) {
       const loaded = await loadSchema(request.schema);
@@ -190,7 +214,9 @@ export async function executeJob(config, request) {
       schema = { ...loaded, jobPath: paths.schema, inline: JSON.stringify(loaded.schema) };
     }
 
+    phase = "stash";
     const rollbackRef = request.mode === "write" ? stashCreate(request.cwd) : null;
+    phase = "compose-prompt";
     const prompt = composePrompt({
       connectorId: config.id,
       mode: request.mode,
@@ -212,6 +238,7 @@ export async function executeJob(config, request) {
       rollbackRef,
     });
 
+    phase = "provider";
     const provider = await runTarget({
       config,
       request,
@@ -241,6 +268,7 @@ export async function executeJob(config, request) {
     });
 
     const filesChanged = request.mode === "write" ? porcelainStatus(request.cwd) : null;
+    phase = "cleanup";
     const cleanupError = await isolation.cleanup();
     const finishedAt = nowIso();
 
@@ -299,6 +327,8 @@ export async function executeJob(config, request) {
       rollbackRef,
       stdoutPath: paths.stdout,
       stderrPath: paths.stderr,
+      invocationPath: provider.invocationPath,
+      promptComposedPath: provider.promptComposedPath,
       stderrTail: provider.stderrTail || null,
       startedAt: current?.startedAt ?? null,
       finishedAt,
@@ -324,6 +354,9 @@ export async function executeJob(config, request) {
     const current = await readJsonOrNull(paths.job);
     if (current?.status === "CANCELED") return null;
     const finishedAt = nowIso();
+    // R1: a failure record must be self-sufficient — phase, stack, log paths
+    // and tails, and the replay artifacts when they were already written.
+    const tails = await readJobTails(config.id, request.jobId).catch(() => null);
     const result = {
       bridgeVersion: request.bridgeVersion,
       connector: config.id,
@@ -333,7 +366,16 @@ export async function executeJob(config, request) {
       mode: request.mode,
       sourceCwd: request.cwd,
       isolationCleanupFailed: cleanupError,
+      phase,
       error: error instanceof Error ? error.message : String(error),
+      errorStack: error instanceof Error ? error.stack : null,
+      executionCwd: isolation?.executionCwd ?? null,
+      stdoutPath: paths.stdout,
+      stderrPath: paths.stderr,
+      stdoutTail: tails?.stdoutTail || null,
+      stderrTail: tails?.stderrTail || null,
+      invocationPath: paths.invocation,
+      promptComposedPath: paths.promptComposed,
       finishedAt,
     };
     await writeJsonAtomic(paths.result, result);

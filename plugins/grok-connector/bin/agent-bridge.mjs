@@ -201,6 +201,9 @@ async function getResult(config, jobId) {
     status: job.status,
     completed: false,
     message: "No terminal result is available yet.",
+    hint: `Use "status ${jobId}" to inspect live stdout/stderr tails.`,
+    stdoutPath: paths.stdout,
+    stderrPath: paths.stderr,
   };
 }
 

@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1788089570105,
-  "projectRoot": "C:\\Users\\User\\documents\\Repos\\plugins\\codex-cc-agy-grok",
+  "lastScanned": 1788377936879,
+  "projectRoot": "C:\\Users\\User\\Documents\\Repos\\plugins\\codex-cc-agy-grok",
   "techStack": {
     "languages": [
       {
@@ -41,6 +41,7 @@
     "isMonorepo": false,
     "workspaces": [],
     "mainDirectories": [
+      "docs",
       "scripts",
       "src",
       "tests"
@@ -53,23 +54,30 @@
       "path": "benchmarks",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1788089570024,
+      "lastAccessed": 1788377936785,
       "keyFiles": [
         "parallel-policy.json"
       ]
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 0,
+      "lastAccessed": 1788377936831,
+      "keyFiles": []
     },
     "plugins": {
       "path": "plugins",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1788089570025,
+      "lastAccessed": 1788377936831,
       "keyFiles": []
     },
     "scripts": {
       "path": "scripts",
       "purpose": "Build/utility scripts",
       "fileCount": 4,
-      "lastAccessed": 1788089570060,
+      "lastAccessed": 1788377936831,
       "keyFiles": [
         "benchmark-parallelism.mjs",
         "build-plugins.mjs",
@@ -81,7 +89,7 @@
       "path": "src",
       "purpose": "Source code",
       "fileCount": 2,
-      "lastAccessed": 1788089570060,
+      "lastAccessed": 1788377936832,
       "keyFiles": [
         "bridge.mjs",
         "session-hook.mjs"
@@ -90,21 +98,21 @@
     "tests": {
       "path": "tests",
       "purpose": "Test files",
-      "fileCount": 5,
-      "lastAccessed": 1788089570061,
+      "fileCount": 7,
+      "lastAccessed": 1788377936832,
       "keyFiles": [
         "benchmark-parallelism.test.mjs",
         "bridge.test.mjs",
-        "mock-provider.mjs",
-        "real-cli.test.mjs",
-        "unit.test.mjs"
+        "m1-adversarial-empirical.test.mjs",
+        "m1-challenger.test.mjs",
+        "mock-provider.mjs"
       ]
     },
     "benchmarks\\fixtures": {
       "path": "benchmarks\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 3,
-      "lastAccessed": 1788089570061,
+      "lastAccessed": 1788377936833,
       "keyFiles": [
         "parallel-benefit.json",
         "parallel-no-gain.json",
@@ -115,7 +123,7 @@
       "path": "src\\lib",
       "purpose": "Library code",
       "fileCount": 12,
-      "lastAccessed": 1788089570063,
+      "lastAccessed": 1788377936835,
       "keyFiles": [
         "args.mjs",
         "exec.mjs",
@@ -126,7 +134,7 @@
       "path": "src\\schemas",
       "purpose": "Schema definitions",
       "fileCount": 1,
-      "lastAccessed": 1788089570064,
+      "lastAccessed": 1788377936836,
       "keyFiles": [
         "review-output.schema.json"
       ]
@@ -135,10 +143,59 @@
       "path": "tests\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 0,
-      "lastAccessed": 1788089570064,
+      "lastAccessed": 1788377936837,
       "keyFiles": []
     }
   },
-  "hotPaths": [],
+  "hotPaths": [
+    {
+      "path": "PROJECT.md",
+      "accessCount": 1,
+      "lastAccessed": 1788378062274,
+      "type": "file"
+    },
+    {
+      "path": "README.md",
+      "accessCount": 1,
+      "lastAccessed": 1788378062588,
+      "type": "file"
+    },
+    {
+      "path": ".agents/ORIGINAL_REQUEST.md",
+      "accessCount": 1,
+      "lastAccessed": 1788378076402,
+      "type": "file"
+    },
+    {
+      "path": ".agents/plugins/oma/plugin.json",
+      "accessCount": 1,
+      "lastAccessed": 1788378104512,
+      "type": "file"
+    },
+    {
+      "path": ".agents/plugins/oma/commands/run.md",
+      "accessCount": 1,
+      "lastAccessed": 1788378105721,
+      "type": "file"
+    },
+    {
+      "path": ".agents/plugins/oma/skills/oma-start/SKILL.md",
+      "accessCount": 1,
+      "lastAccessed": 1788378106051,
+      "type": "file"
+    },
+    {
+      "path": ".agents/plugins/oma/mcp_config.json",
+      "accessCount": 1,
+      "lastAccessed": 1788378114842,
+      "type": "file"
+    },
+    {
+      "path": ".agents/plugins/oma/hooks.json",
+      "accessCount": 1,
+      "lastAccessed": 1788378115843,
+      "type": "file"
+    }
+  ],
   "userDirectives": []
 }

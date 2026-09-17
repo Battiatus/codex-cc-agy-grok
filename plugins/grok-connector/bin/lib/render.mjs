@@ -58,7 +58,26 @@ export function renderResult(result) {
     lines.push("", `**Prompt:** ${result.prompt}`);
   }
 
-  if (result.error) lines.push("", `**Error:** ${result.error}`);
+  if (result.error) {
+    lines.push("", `**Error:** ${result.error}`);
+    if (result.phase) lines.push(`**Failed during phase:** \`${result.phase}\``);
+    if (result.stderrTail) lines.push("", "**stderr (tail):**", "```", result.stderrTail.trimEnd().slice(-2_000), "```");
+  }
+
+  // R1: make failure self-diagnosable — always point at the forensic artifacts.
+  const artifacts = [
+    result.stdoutPath ? `stdout: \`${result.stdoutPath}\`` : null,
+    result.stderrPath ? `stderr: \`${result.stderrPath}\`` : null,
+    result.invocationPath ? `invocation: \`${result.invocationPath}\`` : null,
+    result.promptComposedPath ? `prompt: \`${result.promptComposedPath}\`` : null,
+  ].filter(Boolean);
+  if (artifacts.length && (result.error || result.providerError || result.status === "TIMEOUT")) {
+    lines.push("", `Artifacts — ${artifacts.join(" · ")}`);
+  }
+
+  if (!result.error && (result.status === "RUNNING" || result.status === "QUEUED")) {
+    lines.push("", `Live state: \`status ${result.jobId}\` shows stdout/stderr tails.`);
+  }
   if (result.providerError) lines.push("", `**Provider error:** ${result.providerError}`);
   if (result.scope?.empty) lines.push("", "Nothing was in scope. This is not an approval.");
 

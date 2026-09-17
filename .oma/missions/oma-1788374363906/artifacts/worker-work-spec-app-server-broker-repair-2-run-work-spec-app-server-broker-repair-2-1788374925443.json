@@ -1,0 +1,19 @@
+{
+  "receipt": {
+    "runId": "run-work-spec-app-server-broker-repair-2-1788374925443",
+    "expertId": "fixer",
+    "model": "agy-default",
+    "effort": "agy-default",
+    "sandbox": "workspace-write",
+    "durationMs": 305526,
+    "exitCode": 124,
+    "status": "timed_out",
+    "stdoutHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "scrubbedStdoutHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "receiptHash": "7cf57fcab12abb37a020905441d86472a7e2b5e6ca484cbc1b02d6f0b29cace8"
+  },
+  "status": "timed_out",
+  "error": "Task execution timed out by watchdog.",
+  "stdout": "",
+  "stderr": "\n[OMA ERROR: Process timed out after 300000ms]"
+}

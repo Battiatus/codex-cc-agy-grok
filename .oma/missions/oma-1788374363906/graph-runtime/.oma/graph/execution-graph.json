@@ -1,0 +1,498 @@
+{
+  "schemaVersion": 2,
+  "graphId": "graph-oma-1788374363906",
+  "revision": 4,
+  "schedulerAuthorityId": "oma-scheduler",
+  "nodes": [
+    {
+      "id": "oma-bootstrap",
+      "title": "OMA bootstrap",
+      "kind": "join",
+      "activation": "all",
+      "completionAuthority": "scheduler",
+      "completionAuthorityId": "oma-scheduler"
+    },
+    {
+      "id": "work-audit-architecture-matrix",
+      "title": "Document architectural comparison and feature gap matrix against openai/codex-plugin-cc",
+      "kind": "agent",
+      "activation": "all",
+      "completionAuthority": "broker",
+      "completionAuthorityId": "oma-broker",
+      "executor": {
+        "adapter": "agy",
+        "persona": "worker"
+      },
+      "scope": [
+        "docs/comparison-codex-plugin-cc.md"
+      ],
+      "acceptance": [
+        {
+          "id": "criterion-1",
+          "description": "Perform a comprehensive architectural comparison between openai/codex-plugin-cc and the codex-cc-agy-grok polyglot repository.",
+          "gateId": "git-diff-check"
+        },
+        {
+          "id": "criterion-2",
+          "description": "Document the feature parity matrix covering slash commands, execution models (daemon broker vs CLI exec), isolation sandboxes, and session hooks.",
+          "gateId": "git-diff-check"
+        },
+        {
+          "id": "criterion-3",
+          "description": "Detail the architectural advantages and trade-offs of the symmetrical polyglot bridge vs the dedicated single-target companion.",
+          "gateId": "git-diff-check"
+        }
+      ],
+      "maxDiff": {
+        "files": 1,
+        "lines": 2000
+      }
+    },
+    {
+      "id": "work-spec-stop-review-gate",
+      "title": "Specify stop-review-gate hook and session lifecycle parity with openai/codex-plugin-cc",
+      "kind": "agent",
+      "activation": "all",
+      "completionAuthority": "broker",
+      "completionAuthorityId": "oma-broker",
+      "executor": {
+        "adapter": "agy",
+        "persona": "worker"
+      },
+      "scope": [
+        "docs/specs/stop-review-gate-parity.md"
+      ],
+      "acceptance": [
+        {
+          "id": "criterion-1",
+          "description": "Analyze the stop-review-gate hook from openai/codex-plugin-cc and compare it with the repository's session hooks.",
+          "gateId": "git-diff-check"
+        },
+        {
+          "id": "criterion-2",
+          "description": "Design an actionable specification to integrate stop-review-gate capabilities across polyglot agent connectors.",
+          "gateId": "git-diff-check"
+        },
+        {
+          "id": "criterion-3",
+          "description": "Define validation criteria, trigger conditions, bypass mechanisms, and schema constraints for pre-stop review gates.",
+          "gateId": "git-diff-check"
+        }
+      ],
+      "maxDiff": {
+        "files": 1,
+        "lines": 2000
+      }
+    },
+    {
+      "id": "work-spec-app-server-broker",
+      "title": "Evaluate Codex app-server broker daemon protocol vs batch CLI exec",
+      "kind": "agent",
+      "activation": "all",
+      "completionAuthority": "broker",
+      "completionAuthorityId": "oma-broker",
+      "executor": {
+        "adapter": "agy",
+        "persona": "worker"
+      },
+      "scope": [
+        "docs/specs/app-server-protocol-evaluation.md"
+      ],
+      "acceptance": [
+        {
+          "id": "criterion-1",
+          "description": "Evaluate the JSON-RPC app-server protocol used by openai/codex-plugin-cc against the batch CLI exec architecture.",
+          "gateId": "git-diff-check"
+        },
+        {
+          "id": "criterion-2",
+          "description": "Compare latency, persistent session management, streaming responses, and process lifecycle.",
+          "gateId": "git-diff-check"
+        },
+        {
+          "id": "criterion-3",
+          "description": "Produce a specification for an optional app-server broker adapter in src/lib/provider.mjs compatible with the polyglot connector interface.",
+          "gateId": "git-diff-check"
+        }
+      ],
+      "maxDiff": {
+        "files": 1,
+        "lines": 2000
+      }
+    },
+    {
+      "id": "work-spec-prompts-and-transfer",
+      "title": "Map prompt engineering skills and session transfer compatibility",
+      "kind": "agent",
+      "activation": "all",
+      "completionAuthority": "broker",
+      "completionAuthorityId": "oma-broker",
+      "executor": {
+        "adapter": "agy",
+        "persona": "worker"
+      },
+      "scope": [
+        "docs/specs/prompt-skills-and-transfer-parity.md"
+      ],
+      "acceptance": [
+        {
+          "id": "criterion-1",
+          "description": "Compare upstream prompt engineering guidelines, recipes, and antipatterns with current connector prompt composition.",
+          "gateId": "git-diff-check"
+        },
+        {
+          "id": "criterion-2",
+          "description": "Analyze session context transfer (/codex:transfer) compared to handoff mechanisms in src/lib/transfer.mjs.",
+          "gateId": "git-diff-check"
+        },
+        {
+          "id": "criterion-3",
+          "description": "Define recommendations for harmonizing prompt templates and subagent skills across all connectors.",
+          "gateId": "git-diff-check"
+        }
+      ],
+      "maxDiff": {
+        "files": 1,
+        "lines": 2000
+      }
+    },
+    {
+      "id": "work-update-project-roadmap",
+      "title": "Update PROJECT.md with comparative audit findings and upstream alignment milestones",
+      "kind": "agent",
+      "activation": "all",
+      "completionAuthority": "broker",
+      "completionAuthorityId": "oma-broker",
+      "executor": {
+        "adapter": "agy",
+        "persona": "worker"
+      },
+      "scope": [
+        "PROJECT.md"
+      ],
+      "acceptance": [
+        {
+          "id": "criterion-1",
+          "description": "Update PROJECT.md with findings from the openai/codex-plugin-cc comparative analysis.",
+          "gateId": "git-diff-check"
+        },
+        {
+          "id": "criterion-2",
+          "description": "Add roadmap milestones for upstream feature alignment while maintaining existing polyglot parity.",
+          "gateId": "git-diff-check"
+        },
+        {
+          "id": "criterion-3",
+          "description": "Verify that repository validation and test suites continue to pass with zero failures.",
+          "gateId": "git-diff-check"
+        }
+      ],
+      "maxDiff": {
+        "files": 1,
+        "lines": 2000
+      }
+    },
+    {
+      "id": "work-audit-architecture-matrix-repair-2",
+      "title": "Repair Document architectural comparison and feature gap matrix against openai/codex-plugin-cc",
+      "kind": "agent",
+      "activation": "all",
+      "completionAuthority": "broker",
+      "completionAuthorityId": "oma-broker",
+      "executor": {
+        "adapter": "agy",
+        "persona": "fixer"
+      },
+      "scope": [
+        "docs/comparison-codex-plugin-cc.md"
+      ],
+      "acceptance": [
+        {
+          "id": "criterion-1",
+          "description": "Perform a comprehensive architectural comparison between openai/codex-plugin-cc and the codex-cc-agy-grok polyglot repository.",
+          "gateId": "git-diff-check"
+        },
+        {
+          "id": "criterion-2",
+          "description": "Document the feature parity matrix covering slash commands, execution models (daemon broker vs CLI exec), isolation sandboxes, and session hooks.",
+          "gateId": "git-diff-check"
+        },
+        {
+          "id": "criterion-3",
+          "description": "Detail the architectural advantages and trade-offs of the symmetrical polyglot bridge vs the dedicated single-target companion.",
+          "gateId": "git-diff-check"
+        }
+      ],
+      "maxDiff": {
+        "files": 1,
+        "lines": 2000
+      }
+    },
+    {
+      "id": "work-spec-app-server-broker-repair-2",
+      "title": "Repair Evaluate Codex app-server broker daemon protocol vs batch CLI exec",
+      "kind": "agent",
+      "activation": "all",
+      "completionAuthority": "broker",
+      "completionAuthorityId": "oma-broker",
+      "executor": {
+        "adapter": "agy",
+        "persona": "fixer"
+      },
+      "scope": [
+        "docs/specs/app-server-protocol-evaluation.md"
+      ],
+      "acceptance": [
+        {
+          "id": "criterion-1",
+          "description": "Evaluate the JSON-RPC app-server protocol used by openai/codex-plugin-cc against the batch CLI exec architecture.",
+          "gateId": "git-diff-check"
+        },
+        {
+          "id": "criterion-2",
+          "description": "Compare latency, persistent session management, streaming responses, and process lifecycle.",
+          "gateId": "git-diff-check"
+        },
+        {
+          "id": "criterion-3",
+          "description": "Produce a specification for an optional app-server broker adapter in src/lib/provider.mjs compatible with the polyglot connector interface.",
+          "gateId": "git-diff-check"
+        }
+      ],
+      "maxDiff": {
+        "files": 1,
+        "lines": 2000
+      }
+    },
+    {
+      "id": "work-spec-prompts-and-transfer-repair-2",
+      "title": "Repair Map prompt engineering skills and session transfer compatibility",
+      "kind": "agent",
+      "activation": "all",
+      "completionAuthority": "broker",
+      "completionAuthorityId": "oma-broker",
+      "executor": {
+        "adapter": "agy",
+        "persona": "fixer"
+      },
+      "scope": [
+        "docs/specs/prompt-skills-and-transfer-parity.md"
+      ],
+      "acceptance": [
+        {
+          "id": "criterion-1",
+          "description": "Compare upstream prompt engineering guidelines, recipes, and antipatterns with current connector prompt composition.",
+          "gateId": "git-diff-check"
+        },
+        {
+          "id": "criterion-2",
+          "description": "Analyze session context transfer (/codex:transfer) compared to handoff mechanisms in src/lib/transfer.mjs.",
+          "gateId": "git-diff-check"
+        },
+        {
+          "id": "criterion-3",
+          "description": "Define recommendations for harmonizing prompt templates and subagent skills across all connectors.",
+          "gateId": "git-diff-check"
+        }
+      ],
+      "maxDiff": {
+        "files": 1,
+        "lines": 2000
+      }
+    },
+    {
+      "id": "work-audit-architecture-matrix-repair-2-repair-3",
+      "title": "Repair Repair Document architectural comparison and feature gap matrix against openai/codex-plugin-cc",
+      "kind": "agent",
+      "activation": "all",
+      "completionAuthority": "broker",
+      "completionAuthorityId": "oma-broker",
+      "executor": {
+        "adapter": "agy",
+        "persona": "fixer"
+      },
+      "scope": [
+        "docs/comparison-codex-plugin-cc.md"
+      ],
+      "acceptance": [
+        {
+          "id": "criterion-1",
+          "description": "Perform a comprehensive architectural comparison between openai/codex-plugin-cc and the codex-cc-agy-grok polyglot repository.",
+          "gateId": "git-diff-check"
+        },
+        {
+          "id": "criterion-2",
+          "description": "Document the feature parity matrix covering slash commands, execution models (daemon broker vs CLI exec), isolation sandboxes, and session hooks.",
+          "gateId": "git-diff-check"
+        },
+        {
+          "id": "criterion-3",
+          "description": "Detail the architectural advantages and trade-offs of the symmetrical polyglot bridge vs the dedicated single-target companion.",
+          "gateId": "git-diff-check"
+        }
+      ],
+      "maxDiff": {
+        "files": 1,
+        "lines": 2000
+      }
+    },
+    {
+      "id": "work-spec-app-server-broker-repair-2-repair-3",
+      "title": "Repair Repair Evaluate Codex app-server broker daemon protocol vs batch CLI exec",
+      "kind": "agent",
+      "activation": "all",
+      "completionAuthority": "broker",
+      "completionAuthorityId": "oma-broker",
+      "executor": {
+        "adapter": "agy",
+        "persona": "fixer"
+      },
+      "scope": [
+        "docs/specs/app-server-protocol-evaluation.md"
+      ],
+      "acceptance": [
+        {
+          "id": "criterion-1",
+          "description": "Evaluate the JSON-RPC app-server protocol used by openai/codex-plugin-cc against the batch CLI exec architecture.",
+          "gateId": "git-diff-check"
+        },
+        {
+          "id": "criterion-2",
+          "description": "Compare latency, persistent session management, streaming responses, and process lifecycle.",
+          "gateId": "git-diff-check"
+        },
+        {
+          "id": "criterion-3",
+          "description": "Produce a specification for an optional app-server broker adapter in src/lib/provider.mjs compatible with the polyglot connector interface.",
+          "gateId": "git-diff-check"
+        }
+      ],
+      "maxDiff": {
+        "files": 1,
+        "lines": 2000
+      }
+    },
+    {
+      "id": "work-spec-prompts-and-transfer-repair-2-repair-3",
+      "title": "Repair Repair Map prompt engineering skills and session transfer compatibility",
+      "kind": "agent",
+      "activation": "all",
+      "completionAuthority": "broker",
+      "completionAuthorityId": "oma-broker",
+      "executor": {
+        "adapter": "agy",
+        "persona": "fixer"
+      },
+      "scope": [
+        "docs/specs/prompt-skills-and-transfer-parity.md"
+      ],
+      "acceptance": [
+        {
+          "id": "criterion-1",
+          "description": "Compare upstream prompt engineering guidelines, recipes, and antipatterns with current connector prompt composition.",
+          "gateId": "git-diff-check"
+        },
+        {
+          "id": "criterion-2",
+          "description": "Analyze session context transfer (/codex:transfer) compared to handoff mechanisms in src/lib/transfer.mjs.",
+          "gateId": "git-diff-check"
+        },
+        {
+          "id": "criterion-3",
+          "description": "Define recommendations for harmonizing prompt templates and subagent skills across all connectors.",
+          "gateId": "git-diff-check"
+        }
+      ],
+      "maxDiff": {
+        "files": 1,
+        "lines": 2000
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-oma-bootstrap-work-audit-architecture-matrix",
+      "from": "oma-bootstrap",
+      "to": "work-audit-architecture-matrix",
+      "when": "success"
+    },
+    {
+      "id": "edge-oma-bootstrap-work-spec-stop-review-gate",
+      "from": "oma-bootstrap",
+      "to": "work-spec-stop-review-gate",
+      "when": "success"
+    },
+    {
+      "id": "edge-oma-bootstrap-work-spec-app-server-broker",
+      "from": "oma-bootstrap",
+      "to": "work-spec-app-server-broker",
+      "when": "success"
+    },
+    {
+      "id": "edge-oma-bootstrap-work-spec-prompts-and-transfer",
+      "from": "oma-bootstrap",
+      "to": "work-spec-prompts-and-transfer",
+      "when": "success"
+    },
+    {
+      "id": "edge-work-audit-architecture-matrix-work-update-project-roadmap",
+      "from": "work-audit-architecture-matrix",
+      "to": "work-update-project-roadmap",
+      "when": "success"
+    },
+    {
+      "id": "edge-work-spec-stop-review-gate-work-update-project-roadmap",
+      "from": "work-spec-stop-review-gate",
+      "to": "work-update-project-roadmap",
+      "when": "success"
+    },
+    {
+      "id": "edge-work-spec-app-server-broker-work-update-project-roadmap",
+      "from": "work-spec-app-server-broker",
+      "to": "work-update-project-roadmap",
+      "when": "success"
+    },
+    {
+      "id": "edge-work-spec-prompts-and-transfer-work-update-project-roadmap",
+      "from": "work-spec-prompts-and-transfer",
+      "to": "work-update-project-roadmap",
+      "when": "success"
+    },
+    {
+      "id": "edge-work-audit-architecture-matrix-work-audit-architecture-matrix-repair-2",
+      "from": "work-audit-architecture-matrix",
+      "to": "work-audit-architecture-matrix-repair-2",
+      "when": "failure"
+    },
+    {
+      "id": "edge-work-spec-app-server-broker-work-spec-app-server-broker-repair-2",
+      "from": "work-spec-app-server-broker",
+      "to": "work-spec-app-server-broker-repair-2",
+      "when": "failure"
+    },
+    {
+      "id": "edge-work-spec-prompts-and-transfer-work-spec-prompts-and-transfer-repair-2",
+      "from": "work-spec-prompts-and-transfer",
+      "to": "work-spec-prompts-and-transfer-repair-2",
+      "when": "failure"
+    },
+    {
+      "id": "edge-work-audit-architecture-matrix-repair-2-work-audit-architecture-matrix-repair-2-repair-3",
+      "from": "work-audit-architecture-matrix-repair-2",
+      "to": "work-audit-architecture-matrix-repair-2-repair-3",
+      "when": "failure"
+    },
+    {
+      "id": "edge-work-spec-app-server-broker-repair-2-work-spec-app-server-broker-repair-2-repair-3",
+      "from": "work-spec-app-server-broker-repair-2",
+      "to": "work-spec-app-server-broker-repair-2-repair-3",
+      "when": "failure"
+    },
+    {
+      "id": "edge-work-spec-prompts-and-transfer-repair-2-work-spec-prompts-and-transfer-repair-2-repair-3",
+      "from": "work-spec-prompts-and-transfer-repair-2",
+      "to": "work-spec-prompts-and-transfer-repair-2-repair-3",
+      "when": "failure"
+    }
+  ]
+}

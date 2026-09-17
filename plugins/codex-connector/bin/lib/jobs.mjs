@@ -52,6 +52,8 @@ export function jobPaths(connectorId, jobId, stateHome = null) {
     stderr: join(directory, "provider.stderr.log"),
     finalMessage: join(directory, "provider.final.txt"),
     schema: join(directory, "output-schema.json"),
+    promptComposed: join(directory, "prompt.composed.txt"),
+    invocation: join(directory, "invocation.json"),
   };
 }
 
