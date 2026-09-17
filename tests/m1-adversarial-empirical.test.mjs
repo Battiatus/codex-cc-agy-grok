@@ -117,7 +117,7 @@ test("Empirical Challenge 1: runs command formatting JSON vs Markdown across iso
   const mdRes = await runBridge(["runs", "--all", "--format", "markdown"], { AGENT_CONNECTOR_HOME: testStateHome });
   assert.equal(mdRes.exitCode, 0);
   const mdLines = mdRes.stdout.split("\n");
-  assert.equal(mdLines[0], "| connector | job | status | pid | model | duration | scope | prompt |");
+  assert.equal(mdLines[0], "| connector | job | status | pid | model | duration | stream | scope | prompt |");
   assert.equal(mdLines[1], "| --- | --- | --- | --- | --- | --- | --- | --- |");
   assert.equal(mdLines.length, 5); // header, divider, + 3 job rows
 

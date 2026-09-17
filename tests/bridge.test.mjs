@@ -403,7 +403,7 @@ test("unified runs dashboard aggregates background jobs across connectors in mar
 
   // 2. Query runs dashboard (default Markdown table)
   const dashboardMarkdown = await runBridge("codex", ["runs", "--cwd", directory, "--format", "markdown"], { home });
-  assert.match(dashboardMarkdown.stdout, /\| connector \| job \| status \| pid \| model \| duration \| scope \| prompt \|/);
+  assert.match(dashboardMarkdown.stdout, /\| connector \| job \| status \| pid \| model \| duration \| stream \| scope \| prompt \|/);
   assert.match(dashboardMarkdown.stdout, new RegExp(codexJobId));
   assert.match(dashboardMarkdown.stdout, new RegExp(grokJobId));
 

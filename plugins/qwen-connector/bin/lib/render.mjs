@@ -50,9 +50,26 @@ export function renderResult(result) {
   if (result.sourceCommit) facts.push(`commit ${result.sourceCommit.slice(0, 12)}`);
   const duration = formatDuration(result.durationMs ?? result.liveDurationMs);
   if (duration) facts.push(result.liveDurationMs && !result.durationMs ? `${duration} (live)` : duration);
+  if (typeof result.stdoutBytes === "number" || typeof result.stderrBytes === "number") {
+    facts.push(`streamed ${result.stdoutBytes ?? 0}+${result.stderrBytes ?? 0}B`);
+  }
+  if (result.lastStreamAt && (result.status === "RUNNING" || result.status === "QUEUED")) {
+    const silentMs = Date.now() - new Date(result.lastStreamAt).getTime();
+    facts.push(silentMs < 10_000 ? "stream active" : `silent ${Math.round(silentMs / 1000)}s`);
+  }
   const usage = formatUsage(result.usage, result.costUsd);
   if (usage) facts.push(usage);
   lines.push(facts.join(" · "));
+
+  if (result.timeoutSnapshot) {
+    const snap = result.timeoutSnapshot;
+    const parts = [
+      `killed after ${snap.timeoutMs}ms`,
+      typeof snap.stdoutBytes === "number" ? `${snap.stdoutBytes}+${snap.stderrBytes ?? 0}B received` : null,
+      snap.lastStreamAt ? `last stream ${snap.lastStreamAt}` : "no output ever received",
+    ].filter(Boolean);
+    lines.push("", `**Timeout snapshot:** ${parts.join(" — ")}`);
+  }
 
   if (result.prompt && !result.review && !result.response) {
     lines.push("", `**Prompt:** ${result.prompt}`);
@@ -160,8 +177,8 @@ export function renderRunsDashboard(runs) {
     return "No runs recorded across connectors.";
   }
 
-  const header = "| connector | job | status | pid | model | duration | scope | prompt |";
-  const divider = "| --- | --- | --- | --- | --- | --- | --- | --- |";
+  const header = "| connector | job | status | pid | model | duration | stream | scope | prompt |";
+  const divider = "| --- | --- | --- | --- | --- | --- | --- | --- | --- |";
 
   const rows = runs.map((job) => {
     const duration = formatDuration(job.liveDurationMs ?? job.durationMs) || "—";
@@ -176,6 +193,19 @@ export function renderRunsDashboard(runs) {
       ? `${promptPreview.slice(0, 47)}...`
       : promptPreview;
 
+    // R4: liveness — bytes streamed and silence duration for in-flight jobs.
+    let stream = "—";
+    const hasCounters = typeof job.stdoutBytes === "number" || typeof job.stderrBytes === "number";
+    if (hasCounters) {
+      const bytes = `${job.stdoutBytes ?? 0}+${job.stderrBytes ?? 0}B`;
+      if (job.status === "RUNNING" && job.lastStreamAt) {
+        const silentMs = Date.now() - new Date(job.lastStreamAt).getTime();
+        stream = silentMs < 10_000 ? `${bytes} live` : `${bytes} silent ${Math.round(silentMs / 1000)}s`;
+      } else {
+        stream = bytes;
+      }
+    }
+
     return `| ${[
       job.connector || "—",
       `\`${job.jobId}\``,
@@ -183,6 +213,7 @@ export function renderRunsDashboard(runs) {
       pid,
       model,
       duration,
+      stream,
       scope,
       truncatedPrompt || "—",
     ].join(" | ")} |`;

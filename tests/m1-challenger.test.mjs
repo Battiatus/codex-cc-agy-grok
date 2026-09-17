@@ -190,7 +190,7 @@ test("renderRunsDashboard: table structure integrity, pipes, newlines, tabs, HTM
   const lines = markdown.split("\n");
 
   // Verify header and divider
-  assert.equal(lines[0], "| connector | job | status | pid | model | duration | scope | prompt |");
+  assert.equal(lines[0], "| connector | job | status | pid | model | duration | stream | scope | prompt |");
   assert.equal(lines[1], "| --- | --- | --- | --- | --- | --- | --- | --- |");
 
   // Every row must be a single line (no unescaped newlines breaking table rows)
@@ -309,7 +309,7 @@ test("Multi-agent runs across 7 simulated connectors via direct CLI and state sc
   );
   assert.equal(cliMarkdownResult.status, 0, `CLI runs failed: ${cliMarkdownResult.stderr}`);
   const cliMarkdown = cliMarkdownResult.stdout;
-  assert.ok(cliMarkdown.includes("| connector | job | status | pid | model | duration | scope | prompt |"));
+  assert.ok(cliMarkdown.includes("| connector | job | status | pid | model | duration | stream | scope | prompt |"));
   for (const connector of connectors) {
     assert.ok(cliMarkdown.includes(connector), `Dashboard markdown should include connector ${connector}`);
   }

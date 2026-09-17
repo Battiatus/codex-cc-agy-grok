@@ -97,6 +97,26 @@ async function runTarget({ config, request, paths, executionCwd, prompt, schema,
   const stdout = createCapture();
   const stderr = createCapture();
   let timedOut = false;
+  let timeoutSnapshot = null;
+
+  // R4: live heartbeat — bytes counters + last-stream timestamp, flushed to the
+  // job record on a throttle so `runs`/`status` can tell "active 3s ago" from
+  // "silent for 8 minutes" without touching the log files.
+  let stdoutBytes = 0;
+  let stderrBytes = 0;
+  let lastStreamAt = null;
+  let lastFlushAt = 0;
+  const HEARTBEAT_FLUSH_MS = 2_000;
+  const flushHeartbeat = (force = false) => {
+    const now = Date.now();
+    if (!force && now - lastFlushAt < HEARTBEAT_FLUSH_MS) return;
+    lastFlushAt = now;
+    updateJob(config.id, request.jobId, {
+      lastStreamAt,
+      stdoutBytes,
+      stderrBytes,
+    }).catch(() => {});
+  };
 
   const child = spawn(invocation.command, invocation.args, {
     cwd: executionCwd,
@@ -119,6 +139,9 @@ async function runTarget({ config, request, paths, executionCwd, prompt, schema,
     }
     stdoutFile.write(chunk);
     stdout.push(chunk);
+    stdoutBytes += chunk.length;
+    lastStreamAt = nowIso();
+    flushHeartbeat();
   });
   child.stderr.on("data", (chunk) => {
     if (request.stream) {
@@ -126,10 +149,24 @@ async function runTarget({ config, request, paths, executionCwd, prompt, schema,
     }
     stderrFile.write(chunk);
     stderr.push(chunk);
+    stderrBytes += chunk.length;
+    lastStreamAt = nowIso();
+    flushHeartbeat();
   });
 
   const timer = setTimeout(() => {
     timedOut = true;
+    // R5: capture the pre-kill snapshot so TIMEOUT answers "was it stuck?"
+    timeoutSnapshot = {
+      timedOutAt: nowIso(),
+      timeoutMs: request.timeoutMs,
+      lastStreamAt,
+      stdoutBytes,
+      stderrBytes,
+      stdoutTail: stdout.text().slice(-2_000) || null,
+      stderrTail: stderr.text().slice(-2_000) || null,
+    };
+    updateJob(config.id, request.jobId, { timeoutSnapshot }).catch(() => {});
     terminateTree(child.pid);
   }, request.timeoutMs);
 
@@ -145,6 +182,7 @@ async function runTarget({ config, request, paths, executionCwd, prompt, schema,
     stderr.end();
     stdoutFile.end();
     stderrFile.end();
+    flushHeartbeat(true);
   }
 
   const finalMessage = plan.finalMessagePath
@@ -154,6 +192,10 @@ async function runTarget({ config, request, paths, executionCwd, prompt, schema,
   return {
     ...exit,
     timedOut,
+    timeoutSnapshot,
+    lastStreamAt,
+    stdoutBytes,
+    stderrBytes,
     parsed: parseProviderOutput(config.resultAdapter, { stdout: stdout.text(), finalMessage }),
     applied: built.applied,
     stderrTail: stderr.text().slice(-4_000),
@@ -323,6 +365,7 @@ export async function executeJob(config, request) {
       costUsd: provider.parsed.costUsd,
       numTurns: provider.parsed.numTurns,
       outputTruncated: provider.outputTruncated,
+      timeoutSnapshot: provider.timeoutSnapshot,
       filesChanged: filesChanged ? filesChanged.map((entry) => entry.path) : null,
       rollbackRef,
       stdoutPath: paths.stdout,
@@ -346,6 +389,8 @@ export async function executeJob(config, request) {
       finishedAt,
       durationMs: result.durationMs,
       costUsd: result.costUsd,
+      stdoutBytes: provider.stdoutBytes,
+      stderrBytes: provider.stderrBytes,
       targetPid: null,
     });
     return result;

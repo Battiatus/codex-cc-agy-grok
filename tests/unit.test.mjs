@@ -595,7 +595,7 @@ test("renderRunsDashboard formats a valid Markdown table and sanitizes prompt pr
   ];
 
   const markdown = renderRunsDashboard(jobs);
-  assert.ok(markdown.includes("| connector | job | status | pid | model | duration | scope | prompt |"));
+  assert.ok(markdown.includes("| connector | job | status | pid | model | duration | stream | scope | prompt |"));
   assert.ok(markdown.includes("| --- | --- | --- | --- | --- | --- | --- | --- |"));
   assert.ok(markdown.includes("| codex | `codex-12345` | RUNNING | 1234 | gpt-5.4-mini |"));
   assert.ok(markdown.includes("| claude | `claude-67890` | COMPLETED | — | claude-sonnet-5 |"));
