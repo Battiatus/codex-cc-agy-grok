@@ -8,6 +8,7 @@ const BOOLEAN_FLAGS = new Set([
   "all",
   "background",
   "confirm-write",
+  "follow",
   "help",
   "isolate",
   "json",

@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
@@ -54,6 +54,7 @@ export function jobPaths(connectorId, jobId, stateHome = null) {
     schema: join(directory, "output-schema.json"),
     promptComposed: join(directory, "prompt.composed.txt"),
     invocation: join(directory, "invocation.json"),
+    events: join(directory, "events.ndjson"),
   };
 }
 
@@ -91,6 +92,31 @@ export async function readJsonOrNull(path) {
     return await readJson(path);
   } catch (error) {
     if (error?.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
+// R2: append-only orchestration journal. One NDJSON line per meaningful step so
+// a job's life (queued → spawned → streaming → exit → validated → finished) is
+// never inferred — it is recorded. Plain append: never throws into the caller.
+export async function appendEvent(connectorId, jobId, kind, data = {}, stateHome = null) {
+  const paths = jobPaths(connectorId, jobId, stateHome);
+  await mkdir(paths.directory, { recursive: true }).catch(() => {});
+  // kind/ts/jobId come last so caller data can never shadow the envelope.
+  const line = `${JSON.stringify({ ...data, ts: nowIso(), jobId, kind })}\n`;
+  await appendFile(paths.events, line, "utf8").catch(() => {});
+}
+
+export async function readEvents(connectorId, jobId, { offset = 0 } = {}, stateHome = null) {
+  try {
+    const raw = await readFile(jobPaths(connectorId, jobId, stateHome).events, "utf8");
+    const slice = raw.slice(offset);
+    const lines = slice.split("\n").filter(Boolean).map((line) => {
+      try { return JSON.parse(line); } catch { return null; }
+    }).filter(Boolean);
+    return { events: lines, offset: raw.length };
+  } catch (error) {
+    if (error?.code === "ENOENT") return { events: [], offset: 0 };
     throw error;
   }
 }

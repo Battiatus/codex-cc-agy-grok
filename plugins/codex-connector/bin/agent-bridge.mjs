@@ -14,6 +14,7 @@ import {
   listJobs,
   newJobId,
   nowIso,
+  readEvents,
   readJobTails,
   reapStaleJobs,
   readJson,
@@ -233,6 +234,37 @@ async function inspectJob(defaultConnectorId, jobId, { tailLines = 15 } = {}) {
   };
 }
 
+// R2: live-follow a job's orchestration journal until it reaches a terminal
+// status. One NDJSON line per event; prints each new event as it lands.
+async function followJob(config, jobId, { format = "json", intervalMs = 1_000 } = {}) {
+  const connectorId = jobId.includes("-") ? jobId.split("-")[0] : config.id;
+  let offset = 0;
+  const printEvent = (event) => {
+    if (format === "markdown") {
+      const extra = Object.entries(event)
+        .filter(([key]) => !["ts", "jobId", "kind"].includes(key))
+        .map(([key, value]) => `${key}=${JSON.stringify(value)}`)
+        .join(" ");
+      process.stdout.write(`\`${event.ts}\` **${event.kind}**${extra ? ` — ${extra}` : ""}\n`);
+      return;
+    }
+    process.stdout.write(`${JSON.stringify(event)}\n`);
+  };
+
+  for (;;) {
+    const { events, offset: nextOffset } = await readEvents(connectorId, jobId, { offset });
+    offset = nextOffset;
+    for (const event of events) printEvent(event);
+
+    const job = await readJsonOrNull(jobPaths(connectorId, jobId).job);
+    if (job && TERMINAL_STATUSES.has(job.status)) {
+      process.stdout.write(JSON.stringify({ kind: "follow-end", status: job.status }) + "\n");
+      return job.status;
+    }
+    await new Promise((done) => setTimeout(done, intervalMs));
+  }
+}
+
 function helpText(config) {
   return {
     connector: config.id,
@@ -390,6 +422,10 @@ export async function main(argv = process.argv.slice(2)) {
     if (options.reap) await reapStaleJobs(config.id);
     const jobId = options._[0];
     if (jobId) {
+      if (options.follow) {
+        await followJob(config, jobId, { format });
+        return;
+      }
       const tailLines = parsePositiveNumber("--tail", options.tail) ?? 15;
       const job = await inspectJob(config.id, jobId, { tailLines });
       print(job, format, renderResult);

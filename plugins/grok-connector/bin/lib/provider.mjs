@@ -9,7 +9,7 @@ import { collectGarbage, prepareExecutionRoot } from "./isolation.mjs";
 import { buildInvocationArgs, composePrompt } from "./invocation.mjs";
 import { createCapture, parseProviderOutput } from "./parse.mjs";
 import { interpretVerdict, loadSchema, validate } from "./schema.mjs";
-import { jobPaths, nowIso, readJobTails, readJsonOrNull, updateJob, writeJsonAtomic } from "./jobs.mjs";
+import { appendEvent, jobPaths, nowIso, readJobTails, readJsonOrNull, updateJob, writeJsonAtomic } from "./jobs.mjs";
 
 const MAX_CHAIN_DEPTH = 3;
 const PROVIDER_TIMEOUT_MARGIN_MS = 30_000;
@@ -91,6 +91,12 @@ async function runTarget({ config, request, paths, executionCwd, prompt, schema,
     providerTimeout: plan.providerTimeout,
     timeoutMs: request.timeoutMs,
   }).catch(() => {});
+  const emit = (kind, data) => appendEvent(config.id, request.jobId, kind, data);
+  await emit("invocation-built", {
+    strategy: invocation.strategy,
+    command: invocation.command,
+    argCount: invocation.args.length,
+  });
 
   const stdoutFile = createWriteStream(paths.stdout, { flags: "a" });
   const stderrFile = createWriteStream(paths.stderr, { flags: "a" });
@@ -132,6 +138,7 @@ async function runTarget({ config, request, paths, executionCwd, prompt, schema,
     startedAt: nowIso(),
     invocationStrategy: invocation.strategy,
   });
+  await emit("child-spawned", { pid: child.pid, startedAt: nowIso() });
 
   child.stdout.on("data", (chunk) => {
     if (request.stream) {
@@ -167,6 +174,7 @@ async function runTarget({ config, request, paths, executionCwd, prompt, schema,
       stderrTail: stderr.text().slice(-2_000) || null,
     };
     updateJob(config.id, request.jobId, { timeoutSnapshot }).catch(() => {});
+    emit("timeout-firing", { timeoutMs: request.timeoutMs });
     terminateTree(child.pid);
   }, request.timeoutMs);
 
@@ -183,6 +191,14 @@ async function runTarget({ config, request, paths, executionCwd, prompt, schema,
     stdoutFile.end();
     stderrFile.end();
     flushHeartbeat(true);
+    await emit("child-exit", {
+      code: exit?.code ?? null,
+      signal: exit?.signal ?? null,
+      timedOut,
+      stdoutBytes,
+      stderrBytes,
+      lastStreamAt,
+    });
   }
 
   const finalMessage = plan.finalMessagePath
@@ -223,11 +239,13 @@ function decideStatus({ provider, request, schemaErrors, verdict, scopeEmpty }) 
 export async function executeJob(config, request) {
   const paths = jobPaths(config.id, request.jobId);
   let isolation = null;
+  const emit = (kind, data) => appendEvent(config.id, request.jobId, kind, data);
   // R1: track the failing phase so the failure record says WHERE it broke.
   let phase = "init";
   try {
     const chain = assertChainAllowed(config.id);
     await collectGarbage();
+    await emit("job-started", { mode: request.mode, cwd: request.cwd });
 
     phase = "resolve-scope";
     const scope = request.mode === "review"
@@ -237,6 +255,12 @@ export async function executeJob(config, request) {
         commit: request.commit,
       })
       : null;
+    // NB: no "kind" key in event data — it would shadow the event kind itself.
+    await emit("scope-resolved", {
+      scopeKind: scope?.kind ?? null,
+      fileCount: scope?.files?.length ?? 0,
+      empty: scope?.empty ?? null,
+    });
     const diff = scope ? diffText(request.cwd, scope) : "";
 
     phase = "isolate";
@@ -246,6 +270,7 @@ export async function executeJob(config, request) {
       jobId: request.jobId,
       isolate: request.isolate,
     });
+    await emit("isolation-ready", { strategy: isolation.strategy, executionCwd: isolation.executionCwd });
 
     phase = "schema";
     let schema = null;
@@ -258,6 +283,7 @@ export async function executeJob(config, request) {
 
     phase = "stash";
     const rollbackRef = request.mode === "write" ? stashCreate(request.cwd) : null;
+    if (rollbackRef) await emit("rollback-captured", { rollbackRef });
     phase = "compose-prompt";
     const prompt = composePrompt({
       connectorId: config.id,
@@ -270,6 +296,7 @@ export async function executeJob(config, request) {
       userPrompt: request.prompt,
       isolation: isolation.strategy,
     });
+    await emit("prompt-composed", { length: prompt.length });
 
     await updateJob(config.id, request.jobId, {
       executionCwd: isolation.executionCwd,
@@ -308,10 +335,12 @@ export async function executeJob(config, request) {
       verdict,
       scopeEmpty: Boolean(scope?.empty),
     });
+    await emit("status-decided", { status, schemaErrorCount: schemaErrors?.length ?? 0 });
 
     const filesChanged = request.mode === "write" ? porcelainStatus(request.cwd) : null;
     phase = "cleanup";
     const cleanupError = await isolation.cleanup();
+    await emit("cleanup-done", { failed: Boolean(cleanupError) });
     const finishedAt = nowIso();
 
     const result = {
@@ -393,6 +422,7 @@ export async function executeJob(config, request) {
       stderrBytes: provider.stderrBytes,
       targetPid: null,
     });
+    await emit("finished", { status, completed: result.completed });
     return result;
   } catch (error) {
     const cleanupError = isolation ? await isolation.cleanup() : null;
@@ -423,6 +453,7 @@ export async function executeJob(config, request) {
       promptComposedPath: paths.promptComposed,
       finishedAt,
     };
+    await emit("failed", { phase, error: result.error });
     await writeJsonAtomic(paths.result, result);
     await updateJob(config.id, request.jobId, {
       status: "FAILED",

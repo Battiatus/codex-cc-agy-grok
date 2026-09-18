@@ -420,6 +420,47 @@ test("the review prompt embeds the diff and authorizes read tools while forbiddi
   assert.doesNotMatch(prompt, /no shell and no git tools/);
 });
 
+// Regression: npm .cmd shims reference the node.exe interpreter BEFORE the real
+// entrypoint. Returning node.exe with no prefix args produced `node <args>`
+// which fails invisibly (and `node --version` even looked like success).
+test("shim resolution skips the node.exe interpreter and returns the real entrypoint", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "polyglot-shim-"));
+  const entry = join(dir, "pkg", "bin", "tool.js");
+  await mkdir(join(dir, "pkg", "bin"), { recursive: true });
+  await writeFile(entry, "// entry\n", "utf8");
+  const shim = join(dir, "tool.cmd");
+  await writeFile(shim, [
+    "@ECHO off",
+    `SET "_prog=${process.execPath}"`,
+    `"%_prog%" "${entry}" %*`,
+  ].join("\r\n"), "utf8");
+
+  const resolution = resolveExecutable(shim);
+  assert.equal(resolution.strategy, "shim-entrypoint");
+  assert.equal(resolution.command, process.execPath);
+  assert.deepEqual(resolution.prefixArgs, [entry.replace(/\\/g, "/")]);
+});
+
+// R2: the orchestration journal is append-only NDJSON, in order, resumable.
+test("event journal appends NDJSON lines and reads them back in order", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "polyglot-events-"));
+  const { appendEvent, readEvents, jobPaths } = await import("../src/lib/jobs.mjs");
+  await appendEvent("codex", "job-1", "job-started", { mode: "review" }, dir);
+  await appendEvent("codex", "job-1", "child-spawned", { pid: 123 }, dir);
+  await appendEvent("codex", "job-1", "finished", { status: "COMPLETED" }, dir);
+
+  const { events, offset } = await readEvents("codex", "job-1", {}, dir);
+  assert.deepEqual(events.map((event) => event.kind), ["job-started", "child-spawned", "finished"]);
+  assert.equal(events[1].pid, 123);
+  assert.ok(events.every((event) => event.ts && event.jobId === "job-1"));
+
+  // Incremental read: from the previous offset, nothing new; then one more.
+  assert.deepEqual((await readEvents("codex", "job-1", { offset }, dir)).events, []);
+  await appendEvent("codex", "job-1", "cleanup-done", { failed: false }, dir);
+  const follow = await readEvents("codex", "job-1", { offset }, dir);
+  assert.deepEqual(follow.events.map((event) => event.kind), ["cleanup-done"]);
+});
+
 test("the target executable resolves to something spawnable on this platform", () => {
   const resolution = resolveExecutable("node");
   assert.ok([
