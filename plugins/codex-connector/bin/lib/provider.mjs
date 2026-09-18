@@ -112,6 +112,38 @@ async function runTarget({ config, request, paths, executionCwd, prompt, schema,
   let stderrBytes = 0;
   let lastStreamAt = null;
   let lastFlushAt = 0;
+  // R6: --verbose re-streams provider NDJSON events to the bridge's stderr,
+  // timestamped and summarised, without touching the files the parser reads.
+  let verboseBuffer = "";
+  const timestamp = () => new Date().toISOString().slice(11, 23);
+  const verboseSummarise = (line) => {
+    let summary = line.trim();
+    try {
+      const parsed = JSON.parse(summary);
+      const parts = [
+        parsed.type,
+        parsed.item?.type,
+        parsed.item?.message || parsed.item?.text || parsed.message || parsed.status || "",
+      ].filter((value) => typeof value === "string" && value);
+      summary = parts.length ? parts.join(" / ") : line.trim();
+    } catch {
+      // Not JSON: print the raw line, truncated.
+    }
+    const bounded = summary.length > 300 ? `${summary.slice(0, 297)}...` : summary;
+    process.stderr.write(`[${timestamp()}] ${bounded}\n`);
+  };
+  const verbosePush = (chunk) => {
+    if (!request.verbose) return;
+    verboseBuffer += chunk.toString("utf8");
+    let index = verboseBuffer.indexOf("\n");
+    while (index !== -1) {
+      const line = verboseBuffer.slice(0, index);
+      verboseBuffer = verboseBuffer.slice(index + 1);
+      if (line.trim()) verboseSummarise(line);
+      index = verboseBuffer.indexOf("\n");
+    }
+  };
+
   const HEARTBEAT_FLUSH_MS = 2_000;
   const flushHeartbeat = (force = false) => {
     const now = Date.now();
@@ -149,6 +181,7 @@ async function runTarget({ config, request, paths, executionCwd, prompt, schema,
     stdoutBytes += chunk.length;
     lastStreamAt = nowIso();
     flushHeartbeat();
+    verbosePush(chunk);
   });
   child.stderr.on("data", (chunk) => {
     if (request.stream) {
@@ -191,6 +224,8 @@ async function runTarget({ config, request, paths, executionCwd, prompt, schema,
     stdoutFile.end();
     stderrFile.end();
     flushHeartbeat(true);
+    if (request.verbose && verboseBuffer.trim()) verboseSummarise(verboseBuffer);
+    verboseBuffer = "";
     await emit("child-exit", {
       code: exit?.code ?? null,
       signal: exit?.signal ?? null,
