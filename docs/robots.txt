@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://battiatus.github.io/codex-cc-agy-grok/sitemap.xml
