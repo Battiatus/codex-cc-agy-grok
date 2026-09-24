@@ -44,14 +44,14 @@ function entrypointFromShim(shimPath) {
     return null;
   }
   const shimDirectory = dirname(shimPath);
-  const pattern = /(?:%~?dp0%?|\$basedir|\$\{basedir\})?[\\/]*([a-zA-Z]:[\\/][\w.@/\\ -]+\.(?:exe|js|mjs|cjs)|[\w.@/\\-]+\.(?:exe|js|mjs|cjs))/gi;
+  const pattern = /(?:(?:%~?dp0%?|\$basedir|\$\{basedir\})[\\/]*)?([a-zA-Z]:[\\/][\w.@/\\ -]+\.(?:exe|js|mjs|cjs)|[\w.@/\\ -]+\.(?:exe|js|mjs|cjs))/gi;
   // Shims reference the interpreter itself (node.exe, node) before the real
   // entrypoint; returning it yields `node.exe <args>` which silently runs the
   // wrong program (`node --version` even looks like success). Skip runtimes.
   const isRuntime = (candidate) => /^(?:node(?:js)?\.exe|node)$/i.test(basename(candidate));
   for (const match of contents.matchAll(pattern)) {
     const relative = match[1].replace(/\\/g, "/").replace(/^\.\//, "");
-    const candidate = isAbsolute(relative) ? relative : resolve(shimDirectory, relative);
+    const candidate = (isAbsolute(relative) ? relative : resolve(shimDirectory, relative)).replace(/\\/g, "/");
     if (!existsSync(candidate) || isRuntime(candidate)) continue;
     const isJs = /\.(?:js|mjs|cjs)$/i.test(candidate);
     const isNative = /\.(?:exe)$/i.test(candidate);
