@@ -1,4 +1,4 @@
-# Polyglot Agent Connectors
+# Bridge codex - grok - claude - antigravity
 
 Four independent connector plugins let Codex, Claude Code, Grok Build, and Antigravity delegate bounded work to:
 
