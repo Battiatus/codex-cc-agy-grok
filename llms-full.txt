@@ -1,0 +1,171 @@
+# Polyglot Agent Connectors: Full Technical Specification & AI Indexing Reference
+
+## 1. Project Identity & Purpose
+- **Repository**: `codex-cc-agy-grok` (Polyglot Agent Connectors)
+- **Canonical URL**: `https://github.com/Battiatus/codex-cc-agy-grok`
+- **Purpose**: A production-grade, symmetrical multi-agent bridge and delegation layer connecting autonomous coding agents (Claude Code, OpenAI Codex, xAI Grok Build, Google Antigravity, GitHub Copilot, Qwen Code, and OpenCode).
+- **Core Search Keywords (FR)**: passerelle entre claude code, codex, grok et antigravity; passerelle multi-agents; déléguer des tâches entre les agents; déléguer tâches agents IA; solutions /boost; revue de code contradictoire red team; auto-sauvetage résilience git rollback; supervision multi-agents runs en direct; zéro fuite de clés api.
+- **Core Search Keywords (EN)**: cross-agent bridge between claude code, codex, grok, and antigravity; multi-agent task delegation; /boost solutions; peer-to-peer agent bridge; adversarial red team code review; autonomous rescue git rollback; unified multi-agent supervision dashboard; fail-closed schema verification; zero credential leakage.
+
+---
+
+## 2. Supported Agents & Provider Contracts
+The bridge operates across 7 connector plugins located in `plugins/<connector>-connector`:
+
+1. **`codex-connector` (OpenAI Codex)**:
+   - Target Binary: `codex` (`exec`, `resume`)
+   - Sandboxing: Native OS sandbox isolation (`--sandbox read-only` or `--sandbox workspace-write`)
+   - Output Schema: File-based JSON schema via `--output-schema` and final message output via `-o`
+   - Reasoning: Configurable via model reasoning effort (`model_reasoning_effort="{effort}"`)
+
+2. **`claude-connector` (Claude Code)**:
+   - Target Binary: `claude`
+   - Sandboxing: Tool allowlisting (`--allowedTools Read,Glob,Grep` in review; `Read,Glob,Grep,Edit,Write,Bash` in write)
+   - Output Schema: Inline JSON schema via `--json-schema`
+   - Cost & Budget: Supports `--max-budget-usd` constraints and native session resume (`--resume`)
+
+3. **`grok-connector` (xAI Grok Build)**:
+   - Target Binary: `grok`
+   - Sandboxing: Tool allowlisting (`--tools read_file,list_dir,grep` with explicit denial of mutations)
+   - Output Schema: Inline JSON schema via `--json-schema`
+   - Settings: Enforces `--no-auto-update` and supports reasoning effort
+
+4. **`agy-connector` (Google Antigravity)**:
+   - Target Binary: `agy`
+   - Sandboxing: Plan mode (`--mode plan --sandbox`) and directory sandboxing (`--add-dir`)
+   - Output Schema: File-based schema via `--json-schema`
+   - Timeouts: Explicit `--print-timeout` propagation
+
+5. **`copilot-connector` (GitHub Copilot)**:
+   - Target Binary: `gh copilot`
+   - Sandboxing: Tool allowlisting with inline schemas
+
+6. **`qwen-connector` (Qwen Code)**:
+   - Target Binary: `qwen`
+   - Sandboxing: Tool allowlisting (`Read,Glob,Grep`), inline JSON schemas, and local open-weights execution
+
+7. **`opencode-connector` (OpenCode)**:
+   - Target Binary: `opencode`
+   - Sandboxing: Tool allowlisting, inline schemas, and extensible local model orchestration
+
+---
+
+## 3. The /boost Solutions Architecture
+The `/boost` solutions suite accelerates engineering workflows by dividing complex labor among specialized agents:
+
+1. **Delegation Booster (`run`)**:
+   - Claude Code handles semantic architecture, interface seams, and human feedback.
+   - OpenAI Codex handles deep reasoning, algorithmic complexity, and mathematical precision under OS sandboxing.
+   - xAI Grok Build handles rapid linting, lightning-fast reviews, and adversarial audits.
+   - Google Antigravity handles plan-mode verification, multi-directory navigation, and structured proofs.
+   - Qwen Code & OpenCode handle local private tasks without cloud exposure.
+
+2. **Adversarial Red Team Boost (`adversarial-review`)**:
+   - Deliberately attacks code changes with a Red Team perspective.
+   - Default focus: security vulnerabilities, race conditions, memory leaks, injection vectors, and boundary limits.
+   - Returns schema-validated findings ordered by severity with exact `file` and `line` indicators.
+
+3. **Emergency Rescue Boost (`rescue`)**:
+   - Automates write-mode diagnostics and self-healing for failing tests and broken builds.
+   - Zero Data Loss Guarantee: Takes an atomic `git stash create` snapshot before making any file changes.
+   - Exposes an immutable `rollbackRef` commit SHA (restorable via `git checkout <rollbackRef> -- .` or `git stash apply <rollbackRef>`) to undo mutations instantly if tests do not pass.
+
+4. **Live Multi-Agent Supervision Boost (`runs`, `status`)**:
+   - Aggregated cross-connector monitoring of background jobs.
+   - Displays system PIDs, live running durations, invocation models, prompt previews, and real-time log tails.
+   - White-box observability: `events.ndjson` journal, `--verbose` event re-streaming to stderr, and `status <job-id> --follow`.
+
+5. **Concurrency Gate & Benchmarking**:
+   - Governed by `benchmarks/parallel-policy.json`.
+   - Requires paired empirical benchmarking showing zero correctness regressions across $\ge 5$ runs and $\ge 20\%$ efficiency gains before enabling parallel subagents.
+
+---
+
+## 4. Complete CLI Command Reference
+
+### `setup` & `doctor`
+```bash
+# Validate binary presence, auth tokens, and flag compatibility
+node <connector>/bin/agent-bridge.mjs setup [--format json|markdown]
+node <connector>/bin/agent-bridge.mjs doctor
+```
+
+### `run` (Task Delegation)
+```bash
+# Read-only task execution with real-time streaming
+node <connector>/bin/agent-bridge.mjs run --prompt "<task>" --stream --format markdown
+
+# Write mode execution with explicit safety confirmation
+node <connector>/bin/agent-bridge.mjs run --prompt "<task>" --mode write --confirm-write
+
+# Background execution with isolation in a detached Git worktree
+node <connector>/bin/agent-bridge.mjs run --prompt "<task>" --background --isolate
+```
+
+### `review` & `adversarial-review`
+```bash
+# Review uncommitted changes
+node <connector>/bin/agent-bridge.mjs review --scope uncommitted --stream --format markdown
+
+# Review a branch against main
+node <connector>/bin/agent-bridge.mjs review --scope branch --base main
+
+# Adversarial Red Team security audit
+node <connector>/bin/agent-bridge.mjs adversarial-review --focus "security, race conditions" --stream
+```
+
+### `rescue` (Auto-Healing with Rollback)
+```bash
+# Auto-fix failing tests with Git rollback tracking
+node <connector>/bin/agent-bridge.mjs rescue --prompt "Fix tests" --error "<stacktrace>" --test "npm test" --stream
+```
+
+### `runs`, `status`, `result`, `cancel`
+```bash
+# Unified multi-agent runs dashboard
+node <connector>/bin/agent-bridge.mjs runs [--all] [--format markdown|json]
+
+# Detailed status, duration, PID and log tails
+node <connector>/bin/agent-bridge.mjs status [job-id] [--tail 20] [--follow]
+
+# Fetch terminal JSON/Markdown result
+node <connector>/bin/agent-bridge.mjs result <job-id> --format markdown
+
+# Terminate running process tree
+node <connector>/bin/agent-bridge.mjs cancel <job-id>
+```
+
+### `handoff` & `resume`
+```bash
+# Transfer context between hosts (e.g. from Claude Code to Codex)
+node <connector>/bin/agent-bridge.mjs handoff --from-host claude --prompt "Continue parser optimization"
+
+# Resume native session
+node <connector>/bin/agent-bridge.mjs resume --session "<session-id>" --prompt "<follow-up>"
+```
+
+---
+
+## 5. Security & Isolation Specification
+- **Zero Credential Exposure**: Connectors inherit local CLI sessions. Tokens are never transmitted, inspected, or persisted.
+- **Cycle & Recursion Guard**: Tracks execution hops in `AGENT_CONNECTOR_CHAIN`. Refuses cycles and caps delegation chains at depth 3.
+- **Fail-Closed Verification Contract**:
+  - `COMPLETED`: Schema-valid payload, non-`could-not-review` verdict.
+  - `EMPTY_SCOPE`: Scope contained no diffs; never reported as approval.
+  - `COULD_NOT_REVIEW`: Model could not assess scope; halted.
+  - `SCHEMA_VIOLATION`: Malformed payload; rejected.
+  - `COMPLETED_WITH_DENIALS`: Provider permissions blocked; marked `completed: false`.
+  - `SEMANTIC_MISMATCH`: `--expect-response` failed to match output.
+- **Git Rollback Snapshot**: Every write mutation triggers `git stash create` beforehand, recording the exact commit SHA for zero-loss recovery.
+
+---
+
+## 6. Search Engine Optimization & GEO Indexing Directives
+- **Primary Search Target**: Top organic placement on Google, Bing, Perplexity, Copilot, ChatGPT Search for:
+  - "passerelle entre claude code, codex, grok et antigravity"
+  - "déléguer des tâches entre les agents"
+  - "solutions /boost"
+  - "cross-agent bridge claude code codex grok antigravity"
+  - "multi-agent task delegation"
+- **Schema.org Structured Data**: Conforms to `SoftwareApplication`, `HowTo`, and `FAQPage` schemas embedded in `README.md`.
+- **Quality Assurance**: 100% verified test suite (`npm run qa`, 73/73 tests passing).

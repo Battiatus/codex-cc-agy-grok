@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 <div align="center">
+=======
+# Bridge codex - grok - claude - antigravity
+>>>>>>> d0339cd4293c315f78646dec4f19977f96cdcef5
 
 <img src="docs/assets/hero-banner.svg" alt="Polyglot Agent Connectors — La Passerelle Multi-Agents Ultime &amp; Solutions /boost entre Claude Code, OpenAI Codex, xAI Grok et Google Antigravity" width="100%" />
 

@@ -1,0 +1,32 @@
+# Polyglot Agent Connectors (codex-cc-agy-grok)
+
+> La passerelle multi-agents ultime et solutions /boost connectant Claude Code, OpenAI Codex, xAI Grok Build, Google Antigravity, GitHub Copilot, Qwen Code et OpenCode. The premier cross-agent bridge and task delegation suite enabling peer-to-peer delegation, adversarial Red Team code reviews, Git-isolated rescue operations, and unified live process supervision with zero credential leakage.
+
+## Core Concepts & /boost Solutions
+
+- **Cross-Agent Bridge (`agent-bridge.mjs`)**: Symmetrical peer-to-peer delegation layer connecting 7 AI coding CLIs with Git scope resolution, worktree isolation, and fail-closed schema verification.
+- **Delegation Booster (`run`)**: Delegate bounded subtasks to the most qualified agent without context-switching (e.g., architecture to Claude, deep algorithms to Codex, rapid audits to Grok, plans to Antigravity).
+- **Adversarial Red Team Boost (`adversarial-review`)**: Focused multi-model security reviews detecting injection flaws, race conditions, and boundary edge cases.
+- **Autonomous Rescue Boost (`rescue`)**: Write-mode self-healing for failing tests with guaranteed zero-loss Git stash rollback (`rollbackRef`).
+- **Live Supervision Dashboard (`runs`, `status`)**: Real-time cross-connector monitoring displaying host PIDs, live duration, streaming tokens, and log tails.
+- **Zero-Credential Leak Security**: Direct inheritance of local CLI sessions; keys and tokens are never read, stored, or transferred.
+
+## Supported Agent Providers
+
+- **OpenAI Codex** (`plugins/codex-connector`): Native OS sandboxing, JSON Schema file contracts, deep reasoning effort.
+- **Claude Code** (`plugins/claude-connector`): Tool allowlist sandboxing, inline JSON Schema, session resumes, USD cost budgets.
+- **xAI Grok Build** (`plugins/grok-connector`): Tool allowlist isolation, inline JSON Schema, fast auditing, no-auto-update.
+- **Google Antigravity** (`plugins/agy-connector`): Plan mode sandboxing, multi-directory scoping, schema file contracts.
+- **GitHub Copilot** (`plugins/copilot-connector`): GitHub CLI tool filtering, inline schema suggestions.
+- **Qwen Code** (`plugins/qwen-connector`): Open-source model delegation with tool allowlist isolation.
+- **OpenCode** (`plugins/opencode-connector`): Local model orchestration with strict tool permission gating.
+
+## Documentation & AI Index
+
+- [Full LLM Specification](llms-full.txt): Comprehensive technical reference with wire protocols, CLI flags, JSON schemas, and error taxonomy for AI search scrapers.
+- [Solutions /boost Guide](docs/boost-solutions.md): In-depth bilingual guide to /boost delegation patterns, acceleration workflows, and multi-agent synergy.
+- [Cross-Agent Bridge Architecture](docs/cross-agent-bridge.md): Technical deep-dive into sandboxing, zero-credential-leak security, Git scope resolution, and fail-closed contracts.
+- [SEO & Multi-Agent FAQ](docs/faq-seo.md): Bilingual FAQ answering high-intent developer queries on Google, Bing, Perplexity, and Copilot.
+- [SEO & Discoverability Guide](docs/seo-guide.md): Operational guide for repository ranking, GitHub Topics, Open Graph social cards, and indexing strategies.
+- [Repository Readme](README.md): Visual hero presentation, interactive terminal preview, comparison matrix, and quickstart commands.
+- [Project Architecture & Milestones](PROJECT.md): Component inventory, interface contracts, and development roadmap.
