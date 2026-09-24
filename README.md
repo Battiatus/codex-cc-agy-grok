@@ -1,6 +1,3 @@
-
-<div align="center">
-=======
 # Bridge codex - grok - claude - antigravity
 
 
