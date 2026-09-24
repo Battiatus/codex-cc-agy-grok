@@ -1,0 +1,175 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 440" width="100%" height="100%" role="img" aria-label="Polyglot Agent Connectors — Cross-Agent CLI Bridge for Claude Code, OpenAI Codex, xAI Grok, and Google Antigravity">
+  <defs>
+    <pattern id="dotGrid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1" fill="#21262d" />
+    </pattern>
+    <linearGradient id="surfaceGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#161b22" />
+      <stop offset="100%" stop-color="#0d1117" />
+    </linearGradient>
+  </defs>
+
+  <!-- Base Canvas (GitHub Dark #0d1117) -->
+  <rect width="1200" height="440" rx="10" fill="#0d1117" />
+  <rect width="1200" height="440" rx="10" fill="url(#dotGrid)" />
+  <rect x="0.5" y="0.5" width="1199" height="439" rx="9.5" fill="none" stroke="#30363d" stroke-width="1" />
+
+  <!-- Top Header Status Pill -->
+  <g transform="translate(425, 22)">
+    <rect width="350" height="26" rx="13" fill="#161b22" stroke="#30363d" stroke-width="1" />
+    <circle cx="16" cy="13" r="4" fill="#3fb950" />
+    <text x="182" y="17" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace" font-size="11.5" font-weight="500" fill="#c9d1d9" text-anchor="middle">v0.3.0 · local cli bridge · 73/73 qa passing</text>
+  </g>
+
+  <!-- Official Brand Logo Mark + Main Title -->
+  <g transform="translate(342, 62)">
+    <!-- Geometric Interlocking Mesh Emblem -->
+    <rect x="0" y="0" width="34" height="34" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.2" />
+    <path d="M 10 11 L 17 7 L 24 11 L 24 23 L 17 27 L 10 23 Z" fill="none" stroke="#58a6ff" stroke-width="1.6" stroke-linejoin="round" />
+    <line x1="10" y1="11" x2="24" y2="23" stroke="#30363d" stroke-width="1.2" />
+    <line x1="24" y1="11" x2="10" y2="23" stroke="#30363d" stroke-width="1.2" />
+    <circle cx="17" cy="17" r="2.8" fill="#3fb950" />
+    <circle cx="10" cy="11" r="1.8" fill="#d97757" />
+    <circle cx="24" cy="11" r="1.8" fill="#e6edf3" />
+    <circle cx="10" cy="23" r="1.8" fill="#3fb950" />
+    <circle cx="24" cy="23" r="1.8" fill="#58a6ff" />
+
+    <text x="48" y="26" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Helvetica, Arial, sans-serif" font-size="32" font-weight="700" fill="#f0f6fc" letter-spacing="-0.6">
+      Polyglot Agent Connectors
+    </text>
+  </g>
+
+  <!-- Subtitle -->
+  <text x="600" y="116" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Helvetica, Arial, sans-serif" font-size="14.5" font-weight="400" fill="#8b949e" text-anchor="middle">
+    Passerelle locale inter-agents, délégation de tâches /boost, revue contradictoire Red Team &amp; auto-rescue Git
+  </text>
+
+  <!-- Orthogonal Blueprint Connection Lines -->
+  <g fill="none" stroke="#30363d" stroke-width="1.5">
+    <!-- Top Left to Center -->
+    <path d="M 330 186 L 372 186 L 372 216 L 412 216" />
+    <!-- Bottom Left to Center -->
+    <path d="M 330 292 L 372 292 L 372 260 L 412 260" />
+    <!-- Top Right to Center -->
+    <path d="M 870 186 L 828 186 L 828 216 L 788 216" />
+    <!-- Bottom Right to Center -->
+    <path d="M 870 292 L 828 292 L 828 260 L 788 260" />
+  </g>
+
+  <!-- Connection Port Dots & Symmetrical Protocol Labels -->
+  <g font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace" font-size="10" fill="#6e7681">
+    <circle cx="330" cy="186" r="3" fill="#0d1117" stroke="#8b949e" stroke-width="1.5" />
+    <circle cx="330" cy="292" r="3" fill="#0d1117" stroke="#8b949e" stroke-width="1.5" />
+    <circle cx="870" cy="186" r="3" fill="#0d1117" stroke="#8b949e" stroke-width="1.5" />
+    <circle cx="870" cy="292" r="3" fill="#0d1117" stroke="#8b949e" stroke-width="1.5" />
+
+    <circle cx="412" cy="216" r="3" fill="#0d1117" stroke="#58a6ff" stroke-width="1.5" />
+    <circle cx="412" cy="260" r="3" fill="#0d1117" stroke="#58a6ff" stroke-width="1.5" />
+    <circle cx="788" cy="216" r="3" fill="#0d1117" stroke="#58a6ff" stroke-width="1.5" />
+    <circle cx="788" cy="260" r="3" fill="#0d1117" stroke="#58a6ff" stroke-width="1.5" />
+
+    <text x="372" y="177" text-anchor="middle">stdio · json</text>
+    <text x="372" y="309" text-anchor="middle">schema · diff</text>
+    <text x="828" y="177" text-anchor="middle">stdio · json</text>
+    <text x="828" y="309" text-anchor="middle">schema · worktree</text>
+  </g>
+
+  <!-- Node 1: Claude Code (Top Left) -->
+  <g transform="translate(50, 144)">
+    <rect width="280" height="84" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1" />
+    <rect x="14" y="16" width="44" height="44" rx="6" fill="#0d1117" stroke="#21262d" stroke-width="1" />
+    <!-- Anthropic / Terminal Prompt Vector Icon -->
+    <path d="M 27 33 L 33 38 L 27 43 M 36 43 L 45 43" fill="none" stroke="#d97757" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+    <text x="70" y="30" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif" font-size="14.5" font-weight="600" fill="#f0f6fc">Claude Code</text>
+    <rect x="210" y="16" width="54" height="18" rx="4" fill="#21262d" />
+    <text x="237" y="28.5" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="11" fill="#c9d1d9" text-anchor="middle">claude</text>
+    <text x="70" y="50" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="11" fill="#8b949e">Allowlist: Read,Glob,Grep</text>
+    <text x="70" y="67" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="10.5" fill="#6e7681">Schema: --json-schema (inline)</text>
+  </g>
+
+  <!-- Node 2: OpenAI Codex (Bottom Left) -->
+  <g transform="translate(50, 250)">
+    <rect width="280" height="84" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1" />
+    <rect x="14" y="16" width="44" height="44" rx="6" fill="#0d1117" stroke="#21262d" stroke-width="1" />
+    <!-- Codex Hexagonal Vector Icon -->
+    <polygon points="36,27 45,32.5 45,43.5 36,49 27,43.5 27,32.5" fill="none" stroke="#3fb950" stroke-width="1.8" stroke-linejoin="round" />
+    <circle cx="36" cy="38" r="2.5" fill="#3fb950" />
+    <text x="70" y="30" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif" font-size="14.5" font-weight="600" fill="#f0f6fc">OpenAI Codex</text>
+    <rect x="214" y="16" width="50" height="18" rx="4" fill="#21262d" />
+    <text x="239" y="28.5" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="11" fill="#c9d1d9" text-anchor="middle">codex</text>
+    <text x="70" y="50" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="11" fill="#8b949e">Sandbox: --sandbox read-only</text>
+    <text x="70" y="67" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="10.5" fill="#6e7681">Schema: --output-schema (file)</text>
+  </g>
+
+  <!-- Node 3: xAI Grok Build (Top Right) -->
+  <g transform="translate(870, 144)">
+    <rect width="280" height="84" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1" />
+    <rect x="14" y="16" width="44" height="44" rx="6" fill="#0d1117" stroke="#21262d" stroke-width="1" />
+    <!-- Grok / Slash Vector Icon -->
+    <path d="M 28 46 L 44 30 M 29 30 L 43 46" fill="none" stroke="#e6edf3" stroke-width="1.8" stroke-linecap="round" />
+    <text x="70" y="30" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif" font-size="14.5" font-weight="600" fill="#f0f6fc">xAI Grok Build</text>
+    <rect x="218" y="16" width="46" height="18" rx="4" fill="#21262d" />
+    <text x="241" y="28.5" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="11" fill="#c9d1d9" text-anchor="middle">grok</text>
+    <text x="70" y="50" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="11" fill="#8b949e">Allowlist: read_file,list_dir</text>
+    <text x="70" y="67" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="10.5" fill="#6e7681">Schema: --json-schema (inline)</text>
+  </g>
+
+  <!-- Node 4: Google Antigravity (Bottom Right) -->
+  <g transform="translate(870, 250)">
+    <rect width="280" height="84" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1" />
+    <rect x="14" y="16" width="44" height="44" rx="6" fill="#0d1117" stroke="#21262d" stroke-width="1" />
+    <!-- Antigravity Delta/Orbit Vector Icon -->
+    <polygon points="36,27 46,46 26,46" fill="none" stroke="#58a6ff" stroke-width="1.8" stroke-linejoin="round" />
+    <text x="70" y="30" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif" font-size="14.5" font-weight="600" fill="#f0f6fc">Google Antigravity</text>
+    <rect x="222" y="16" width="42" height="18" rx="4" fill="#21262d" />
+    <text x="243" y="28.5" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="11" fill="#c9d1d9" text-anchor="middle">agy</text>
+    <text x="70" y="50" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="11" fill="#8b949e">Isolation: --mode plan --sandbox</text>
+    <text x="70" y="67" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="10.5" fill="#6e7681">Schema: --json-schema (file)</text>
+  </g>
+
+  <!-- Central Bridge Component Card -->
+  <g transform="translate(412, 144)">
+    <rect width="376" height="190" rx="8" fill="url(#surfaceGrad)" stroke="#30363d" stroke-width="1.2" />
+    <!-- Card Header -->
+    <path d="M 0 8 Q 0 0 8 0 L 368 0 Q 376 0 376 8 L 376 36 L 0 36 Z" fill="#161b22" />
+    <line x1="0" y1="36" x2="376" y2="36" stroke="#30363d" stroke-width="1" />
+    <circle cx="18" cy="18" r="4" fill="#58a6ff" />
+    <text x="30" y="22" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="12.5" font-weight="600" fill="#f0f6fc">agent-bridge.mjs</text>
+    <rect x="270" y="9" width="92" height="18" rx="4" fill="#21262d" stroke="#30363d" stroke-width="0.8" />
+    <text x="316" y="21.5" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="10" font-weight="600" fill="#3fb950" text-anchor="middle">FAIL-CLOSED</text>
+
+    <!-- Card Content Rows -->
+    <g transform="translate(16, 60)" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="11.5">
+      <!-- Row 1 -->
+      <text x="0" y="0" fill="#58a6ff" font-weight="600">run / review</text>
+      <text x="150" y="0" fill="#8b949e">Git-scoped diff &amp; live --stream</text>
+      <line x1="0" y1="12" x2="344" y2="12" stroke="#21262d" stroke-width="1" />
+
+      <!-- Row 2 -->
+      <text x="0" y="33" fill="#d29922" font-weight="600">adversarial-review</text>
+      <text x="150" y="33" fill="#8b949e">Red Team security &amp; edge audit</text>
+      <line x1="0" y1="45" x2="344" y2="45" stroke="#21262d" stroke-width="1" />
+
+      <!-- Row 3 -->
+      <text x="0" y="66" fill="#3fb950" font-weight="600">rescue</text>
+      <text x="150" y="66" fill="#8b949e">Write fix + git stash rollbackRef</text>
+      <line x1="0" y1="78" x2="344" y2="78" stroke="#21262d" stroke-width="1" />
+
+      <!-- Row 4 -->
+      <text x="0" y="99" fill="#c9d1d9" font-weight="600">runs / status</text>
+      <text x="150" y="99" fill="#8b949e">Unified PID, log tail &amp; --follow</text>
+    </g>
+  </g>
+
+  <!-- Bottom Technical Metadata Strip -->
+  <g transform="translate(50, 366)">
+    <rect width="1100" height="44" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1" />
+    <text x="20" y="26" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="12" fill="#8b949e">
+      <tspan fill="#f0f6fc" font-weight="600">7 Connectors:</tspan> claude · codex · grok · agy · copilot · qwen · opencode
+    </text>
+    <line x1="560" y1="10" x2="560" y2="34" stroke="#30363d" stroke-width="1" />
+    <text x="580" y="26" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="12" fill="#8b949e">
+      <tspan fill="#3fb950">●</tspan> JSON Schema Validated   <tspan fill="#58a6ff">●</tspan> Worktree Isolation   <tspan fill="#c9d1d9">●</tspan> Zero Credential Storage
+    </text>
+  </g>
+</svg>

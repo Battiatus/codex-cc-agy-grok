@@ -29,6 +29,8 @@ A unified, symmetrical polyglot multi-agent bridge and connector suite enabling 
 | 8 | Manifest Generation | Generate all 7+ command markdown files in `scripts/build-plugins.mjs` | M4 | ORIGINAL_REQUEST §R4 | DONE |
 | 9 | Validator Parity | Update `REQUIRED_COMMANDS` and validation in `scripts/validate-cross-host.mjs` | M4 | ORIGINAL_REQUEST §R4 | DONE |
 | 10 | QA Suite 100% Pass | Full unit, bridge, benchmark, and validation test suite with 0 failures | M5 | ORIGINAL_REQUEST §Acceptance Criteria | DONE |
+| 11 | SEO & AI Indexing | `llms.txt`, `llms-full.txt`, `package.json` SEO metadata, bilingual search guides | M6 | SEO & Discovery Optimization | DONE |
+| 12 | High-Impact Presentation & `/boost` Docs | Hero `README.md`, `docs/boost-solutions.md`, `docs/cross-agent-bridge.md`, `docs/faq-seo.md` | M6 | First-Glance Visuals & `/boost` Solutions | DONE |
 
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
@@ -38,6 +40,7 @@ A unified, symmetrical polyglot multi-agent bridge and connector suite enabling 
 | 3 | M3: Tool Unblocking & Concurrency | `src/lib/invocation.mjs`, `benchmarks/parallel-policy.json`, `tests/benchmark-parallelism.test.mjs` | none | DONE |
 | 4 | M4: Manifest Generation & Plugin Build | `scripts/build-plugins.mjs`, `scripts/validate-cross-host.mjs`, `plugins/*` | M1, M2, M3 | DONE |
 | 5 | M5: E2E Verification & Forensic Audit | `npm run qa`, CLI command checks, adversarial review & rescue verifications | M1, M2, M3, M4 | DONE |
+| 6 | M6: Search Engine & AI Discovery (`/boost`) | `README.md`, `package.json`, `llms.txt`, `llms-full.txt`, `docs/*.md` | M5 | DONE |
 
 ## Interface Contracts
 ### CLI Bridge ↔ Job Store
@@ -65,3 +68,5 @@ A unified, symmetrical polyglot multi-agent bridge and connector suite enabling 
 - `scripts/validate-cross-host.mjs`: Cross-host manifest & build freshness validator.
 - `tests/`: Automated test suite (`unit.test.mjs`, `bridge.test.mjs`, `benchmark-parallelism.test.mjs`, `mock-provider.mjs`).
 - `plugins/`: 7 connector plugin packages (`codex-connector`, `claude-connector`, `agy-connector`, `grok-connector`, `copilot-connector`, `qwen-connector`, `opencode-connector`).
+- `llms.txt` & `llms-full.txt`: Standard AI/LLM indexing specifications for search engines (Perplexity, Copilot, Google, Bing).
+- `docs/`: Deep-dive guides (`boost-solutions.md`, `cross-agent-bridge.md`, `faq-seo.md`, `seo-guide.md`) and visual SVG assets (`docs/assets/hero-banner.svg`, `docs/assets/terminal-preview.svg`).
