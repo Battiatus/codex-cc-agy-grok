@@ -23,7 +23,7 @@
   <b>Déléguez des tâches entre Claude Code, Codex, Grok et Antigravity • Revues Red Team • Auto-Rescue avec Rollback Git garanti.</b>
 </p>
 
-[🇫🇷 Présentation en Français](#-passerelle-multi-agents--solutions-boost-en-français) •
+[Présentation en Français](#-passerelle-multi-agents--solutions-boost-en-français) •
 [⚡ Solutions /boost](#-solutions-boost--high-velocity-workflows) •
 [🖥️ Aperçu Terminal](#️-aperçu-terminal--cli-execution--live-runs) •
 [🏛️ Architecture](#-visual-architecture--cross-agent-mesh) •
