@@ -11,14 +11,14 @@ Toutes les optimisations structurelles internes ont été appliquées directemen
 
 1. **Impact Visuel Immédiat ("Du Premier Regard")** :
    - **Bannière Hero SVG (`docs/assets/hero-banner.svg`)** : Design d'ingénierie sobre et soigné (style GitHub Dark / Linear) illustrant le maillage technique entre Claude Code, OpenAI Codex, xAI Grok Build et Google Antigravity connecté au moteur central `agent-bridge.mjs`.
-   - **Aperçu Terminal Temps Réel (`docs/assets/terminal-preview.svg`)** : Rendu fidèle d'une session terminal affichant la sortie réelle des commandes `adversarial-review` et `runs`.
+   - **Aperçu Terminal Temps Réel (`docs/assets/terminal-preview.svg`)** : Illustration d'une session terminal affichant les commandes `adversarial-review` et `runs`.
 2. **Optimisation Sémantique Bilingue (FR / EN) dans `README.md`** :
    - Balises de titres (`H1`, `H2`, `H3`) alignées sur les intentions de recherche exactes : *"Passerelle entre Claude Code, Codex, Grok et Antigravity"*, *"Déléguer des tâches entre les agents"*, *"Solutions /boost"*.
-   - Données structurées **Schema.org (`JSON-LD`)** intégrées (`SoftwareApplication` & `FAQPage`) pour l'indexation riche par Googlebot et Bingbot.
+   - Données structurées **Schema.org (`JSON-LD`)** intégrées (`SoftwareApplication` dans `README.md`, `SoftwareApplication` & `FAQPage` dans `docs/index.html`) pour l'indexation riche par Googlebot et Bingbot.
 3. **Indexation IA & Moteurs Génératifs (`llms.txt` & `llms-full.txt`)** :
    - Conformité stricte au standard [llmstxt.org](https://llmstxt.org/) pour alimenter Perplexity, ChatGPT Search, Claude Web Search, Microsoft Copilot et Google AI Overviews.
 4. **Métadonnées Riches (`package.json`)** :
-   - 34 mots-clés stratégiques bilingues (`passerelle-claude-code-codex-grok-antigravity`, `deleguer-taches-entre-les-agents`, `solutions-boost`, `cross-agent-bridge`, `multi-agent-delegation`, `adversarial-review`, `autonomous-rescue`, etc.).
+   - 33 mots-clés stratégiques bilingues (`passerelle-claude-code-codex-grok-antigravity`, `deleguer-taches-entre-les-agents`, `solutions-boost`, `cross-agent-bridge`, `multi-agent-delegation`, `adversarial-review`, `autonomous-rescue`, etc.).
 5. **Corpus Documentaire Dédié (`docs/`)** :
    - [`docs/boost-solutions.md`](boost-solutions.md) : Guide complet des 4 piliers `/boost`.
    - [`docs/cross-agent-bridge.md`](cross-agent-bridge.md) : Architecture technique et modèle de sécurité *Zero Credential Leak*.
@@ -35,7 +35,7 @@ Cliquez sur l'icône ⚙️ (**Edit repository details**) sur la page principale
 
 - **Description** (160-250 caractères max, riche en mots-clés) :
   ```text
-  ⚡ Passerelle multi-agents & solutions /boost entre Claude Code, OpenAI Codex, xAI Grok Build & Google Antigravity. Déléguez des tâches entre agents IA, revue Red Team & auto-rescue Git rollback. Cross-agent bridge CLI.
+  ⚡ Passerelle multi-agents & solutions /boost entre Claude Code, OpenAI Codex, xAI Grok Build & Google Antigravity. Déléguez des tâches entre agents IA, revue Red Team & rescue sur branche Git isolée. Cross-agent bridge CLI.
   ```
 - **Website** :
   Lien vers la documentation ou la section principale :

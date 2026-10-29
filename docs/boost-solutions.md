@@ -1,6 +1,6 @@
 # Solutions /boost : Multi-Agent Task Delegation & Acceleration Suite
 
-> **Français** : Guide complet des solutions `/boost` pour orchestrer et déléguer efficacement des tâches entre Claude Code, OpenAI Codex, xAI Grok Build, Google Antigravity, GitHub Copilot, Qwen Code et OpenCode.  
+> **Français** : Guide complet des solutions `/boost` pour déléguer efficacement des tâches entre Claude Code, OpenAI Codex, xAI Grok Build, Google Antigravity, GitHub Copilot, Qwen Code et OpenCode.  
 > **English**: Comprehensive guide to `/boost` solutions for high-velocity task delegation across Claude Code, OpenAI Codex, xAI Grok Build, Google Antigravity, GitHub Copilot, Qwen Code, and OpenCode.
 
 ---
@@ -11,10 +11,10 @@ In modern AI-assisted software engineering, no single model or assistant excels 
 - **Claude Code** is the premier choice for codebase architecture, semantic refactoring, and interactive human-in-the-loop flows.
 - **OpenAI Codex** delivers unparalleled deep reasoning, algorithmic precision, and strict OS-sandboxed execution.
 - **xAI Grok Build** provides ultra-fast turnarounds, razor-sharp Red Team critiques, and agile test triage.
-- **Google Antigravity** shines at plan-mode architectural validation, multi-directory navigation, and structured workflows.
-- **GitHub Copilot, Qwen Code & OpenCode** provide open-weights and IDE-integrated execution options.
+- **Google Antigravity** shines at plan-mode architectural validation and structured workflows.
+- **GitHub Copilot, Qwen Code & OpenCode** add more execution options through their standalone `copilot`, `qwen` and `opencode` CLIs.
 
-The **/boost solutions suite** bridges these tools, turning isolated CLIs into an **autonomous multi-agent powerhouse**. Instead of juggling terminals or manually copy-pasting code, developers use unified `/boost` patterns to delegate tasks instantaneously.
+The **/boost solutions suite** bridges these tools through **one plugin (`polyglot`) and one bridge** (`plugins/polyglot/bin/agent-bridge.mjs`), turning isolated CLIs into a **coordinated multi-agent toolkit**. Instead of juggling terminals or manually copy-pasting code, developers use unified `/boost` patterns: every job command takes `--to codex|claude|grok|agy|copilot|qwen|opencode`, runs in the background with `--background`, and returns through `wait`.
 
 ---
 
@@ -23,18 +23,18 @@ The **/boost solutions suite** bridges these tools, turning isolated CLIs into a
 ```
                      ┌───────────────────────────────────────┐
                      │           /boost Solutions            │
-                     │  Cross-Agent Orchestration Suite      │
+                     │  Cross-Agent Delegation Suite         │
                      └──────────────────┬────────────────────┘
                                         │
          ┌──────────────────┬───────────┴──────────┬──────────────────┐
          ▼                  ▼                      ▼                  ▼
 ┌─────────────────┐┌─────────────────┐┌─────────────────┐┌─────────────────┐
 │ 1. Delegation   ││ 2. Adversarial  ││ 3. Autonomous   ││ 4. Supervision  │
-│    Booster      ││    Red Team     ││    Rescue       ││    & Benchmark  │
+│    Booster      ││    Red Team     ││    Rescue       ││    & Wait       │
 │                 ││                 ││                 ││                 │
-│ Instant peer-to-││ Multi-model     ││ Self-healing    ││ Live runs,      │
-│ peer task       ││ security review ││ write-mode with ││ PIDs, follow,   │
-│ offloading      ││ & exploit audit ││ Git rollback    ││ & token meters  │
+│ Instant peer-to-││ Peer-agent      ││ Write-mode fix  ││ Live runs,      │
+│ peer task       ││ security review ││ on an isolated  ││ PIDs, follow,   │
+│ offloading      ││ & exploit audit ││ Git branch      ││ wait & cost     │
 └─────────────────┘└─────────────────┘└─────────────────┘└─────────────────┘
 ```
 
@@ -43,14 +43,15 @@ Offload specialized subtasks to the most qualified agent with a single command:
 - **Architecture & System Design**: Claude Code (`claude`)
 - **Algorithmic Logic & Mathematical Precision**: Codex (`codex`, `--effort high` or `xhigh`)
 - **Fast Linting & Rapid Auditing**: Grok Build (`grok`)
-- **Plan Verification & Multi-Path Scoping**: Antigravity (`agy`, `--mode plan`)
-- **Private & Local Code Tasks**: Qwen Code (`qwen`) & OpenCode (`opencode`)
+- **Plan Verification**: Antigravity (`agy`, plan mode for read-only runs)
+- **Tasks on Locally Configured Models**: Qwen Code (`qwen`) & OpenCode (`opencode`)
 
 ```bash
 # From Claude Code or Antigravity, boost deep reasoning by delegating to Codex:
-node plugins/codex-connector/bin/agent-bridge.mjs run \
+node plugins/polyglot/bin/agent-bridge.mjs run --to codex \
   --prompt "Analyze time-complexity bottleneck and optimize graph traversal" \
-  --model o3-mini --effort high --stream --format markdown
+  --model o3-mini --effort high --background
+node plugins/polyglot/bin/agent-bridge.mjs wait <job-id> --format markdown
 ```
 
 ### Pillar 2: Adversarial Red Team Review (Revue Contradictoire)
@@ -58,34 +59,39 @@ Single-model reviews suffer from confirmation bias. The `/boost` adversarial rev
 
 ```bash
 # Trigger an adversarial Red Team audit using Grok Build:
-node plugins/grok-connector/bin/agent-bridge.mjs adversarial-review \
+node plugins/polyglot/bin/agent-bridge.mjs adversarial-review --to grok \
   --focus "security, race conditions, memory leaks, privilege escalation" \
-  --scope uncommitted --stream --format markdown
+  --scope uncommitted --background
+node plugins/polyglot/bin/agent-bridge.mjs wait <job-id> --format markdown
 ```
 
-### Pillar 3: Autonomous Rescue with Git Rollback (Sauvetage et Auto-Guérison)
-When tests fail or a build breaks, developers don't have to troubleshoot manually. The `/boost` rescue solution spins up write-mode fixes while guaranteeing **zero accidental data loss** through automatic `git stash create` snapshots:
+### Pillar 3: Autonomous Rescue on an Isolated Git Branch (Sauvetage et Auto-Guérison)
+When tests fail or a build breaks, developers don't have to troubleshoot manually. The `/boost` rescue solution hands the fix to a peer agent in write mode, inside a git worktree on a `polyglot/<job-id>` branch, so **your working tree is never written by the bridge (a job is flagged `sourceTreeModified` if the agent wrote there anyway)**. Write mode always requires `--confirm-write`, and is refused outside a git repository:
 
 ```bash
-# Trigger an automated rescue operation with Antigravity:
-node plugins/agy-connector/bin/agent-bridge.mjs rescue \
+# Trigger a rescue operation with Antigravity:
+node plugins/polyglot/bin/agent-bridge.mjs rescue --to agy \
   --prompt "Fix failing unit tests in parser module" \
   --error "TypeError: Cannot read properties of undefined (reading 'tokens')" \
   --test "npm test" \
-  --stream --format markdown
+  --confirm-write --background
 ```
-If the rescue succeeds, tests pass. If unexpected regressions occur, the exact `rollbackRef` is displayed to revert instantly with `git checkout <rollbackRef> -- .` (or `git stash apply <rollbackRef>`).
+When the job finishes, the result lists every changed file (the exact diff `base..branch`) and three commands: **Inspect** (`git diff <base> <branch>`), **Apply** (`git diff <base> <branch> | git apply`) or **Discard** (`git branch -D <branch>`). `cancel` discards the branch of a running write job.
 
-### Pillar 4: Supervision & Concurrency Gate
-Sub-agent parallelism without quality gates leads to token thrashing and regressions. The `/boost` suite integrates real-time process supervision and a strict parallelism gate (`benchmarks/parallel-policy.json`):
+### Pillar 4: Supervision & Wait
+Background jobs need visibility. The `/boost` suite integrates a unified dashboard across providers and a `wait` command that blocks until jobs finish and returns their full results:
 
 ```bash
-# View unified multi-agent runs dashboard across all connectors
-node plugins/claude-connector/bin/agent-bridge.mjs runs --format markdown
+# View the unified runs dashboard (jobs per status, total cost, one row per job)
+node plugins/polyglot/bin/agent-bridge.mjs runs --format markdown
 
-# Follow a running job in real time with live log stream
-node plugins/codex-connector/bin/agent-bridge.mjs status <job-id> --follow
+# Block until one or more jobs finish (exit code 3 = still running, call it again)
+node plugins/polyglot/bin/agent-bridge.mjs wait <job-id-1> <job-id-2> --timeout 9m --format markdown
+
+# Follow a running job's event journal in real time
+node plugins/polyglot/bin/agent-bridge.mjs status <job-id> --follow
 ```
+To ask several agents, launch one background job per provider, then `wait id1 id2`. Each provider's result comes back separately; the bridge does not merge them.
 
 ---
 
@@ -93,18 +99,18 @@ node plugins/codex-connector/bin/agent-bridge.mjs status <job-id> --follow
 
 ### Scenario A: Full Feature Development Cycle
 1. **Architect** with Claude Code: Design module seams and interface specifications.
-2. **Implement & Logic Verify** with Codex: Pass algorithmic implementation to Codex via `/boost delegate`.
-3. **Red Team Review** with Grok Build: Execute `adversarial-review` on uncommitted git changes.
-4. **Plan-Mode Verification** with Antigravity: Run `setup` and cross-directory integration check.
-5. **Supervise** with Unified Dashboard: Run `runs` to inspect all active jobs, duration, PIDs, and logs.
+2. **Implement & Logic Verify** with Codex: Pass algorithmic implementation to Codex via `/polyglot:delegate --to codex`.
+3. **Red Team Review** with Grok Build: Execute `adversarial-review --to grok` on uncommitted git changes.
+4. **Plan-Mode Verification** with Antigravity: Run a read-only `review --to agy` on the same scope.
+5. **Supervise** with Unified Dashboard: Run `runs` to inspect all jobs, duration, PIDs, cost and logs, and `wait` to collect their results.
 
 ### Scenario B: Multi-Agent Handoff
-Transfer conversational context seamlessly from Claude Code to Codex or Grok:
+Transfer a derived digest of the conversation from Claude Code to Codex or Grok (a derived context, not a lossless session resume):
 ```bash
-node plugins/codex-connector/bin/agent-bridge.mjs handoff \
+node plugins/polyglot/bin/agent-bridge.mjs handoff --to codex \
   --from-host claude \
   --prompt "Continue implementing the streaming parser based on our architecture session" \
-  --stream --format markdown
+  --background
 ```
 
 ---
@@ -112,8 +118,8 @@ node plugins/codex-connector/bin/agent-bridge.mjs handoff \
 ## 4. French Quickstart Summary (Résumé en Français)
 
 Pour utiliser les solutions `/boost` dans vos projets quotidiens :
-1. **Installation Clé en Main** : `node scripts/install.mjs --host all --plugin all --apply`
-2. **Délégation Instantanée** : `node plugins/claude-connector/bin/agent-bridge.mjs run --prompt "<votre tâche>" --stream`
-3. **Audit de Sécurité Red Team** : `node plugins/grok-connector/bin/agent-bridge.mjs adversarial-review --focus "sécurité"`
-4. **Auto-Réparation & Rollback** : `node plugins/codex-connector/bin/agent-bridge.mjs rescue --test "npm test"`
-5. **Supervision en Direct** : `node plugins/agy-connector/bin/agent-bridge.mjs runs`
+1. **Installation Clé en Main** : `node scripts/install.mjs --host all --apply`
+2. **Délégation Instantanée** : `node plugins/polyglot/bin/agent-bridge.mjs run --to claude --prompt "<votre tâche>" --background`, puis `wait <job-id>`
+3. **Audit de Sécurité Red Team** : `node plugins/polyglot/bin/agent-bridge.mjs adversarial-review --to grok --focus "sécurité" --background`
+4. **Réparation sur Branche Git Isolée** : `node plugins/polyglot/bin/agent-bridge.mjs rescue --to codex --test "npm test" --confirm-write --background`
+5. **Supervision en Direct** : `node plugins/polyglot/bin/agent-bridge.mjs runs`

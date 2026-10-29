@@ -1,0 +1,11 @@
+{
+  "description": "Records the host transcript for handoff and reaps jobs whose worker died.",
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/bin/session-hook.mjs\" SessionStart", "timeout": 5 }] }
+    ],
+    "SessionEnd": [
+      { "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/bin/session-hook.mjs\" SessionEnd", "timeout": 3 }] }
+    ]
+  }
+}

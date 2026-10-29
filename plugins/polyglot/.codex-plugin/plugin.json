@@ -1,0 +1,20 @@
+{
+  "name": "polyglot",
+  "version": "0.4.0",
+  "description": "Delegate git-scoped reviews and bounded coding tasks to any local agent CLI (Codex, Claude Code, Grok Build, Antigravity, Copilot, Qwen Code, OpenCode), track every job, and wait for results.",
+  "author": { "name": "Polyglot Connectors contributors" },
+  "license": "MIT",
+  "keywords": ["agent", "delegation", "cross-host", "code-review"],
+  "interface": {
+    "displayName": "Polyglot",
+    "shortDescription": "Delegate reviews and tasks to other agent CLIs.",
+    "longDescription": "Delegate git-scoped reviews and bounded coding tasks to any local agent CLI (Codex, Claude Code, Grok Build, Antigravity, Copilot, Qwen Code, OpenCode), track every job, and wait for results. Review is the default mode, runs read-only, and returns a schema-validated verdict. Write jobs land on a polyglot/<job-id> branch, never in the working tree.",
+    "developerName": "Polyglot Connectors contributors",
+    "category": "Developer Tools",
+    "capabilities": ["Interactive"],
+    "defaultPrompt": [
+      "Ask Claude Code to review my uncommitted changes.",
+      "Delegate this diagnosis to Grok."
+    ]
+  }
+}

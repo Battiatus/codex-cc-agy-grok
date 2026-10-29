@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 2,
+  "id": "copilot",
+  "displayName": "GitHub Copilot CLI",
+  "binary": "copilot",
+  "resultAdapter": "copilot",
+  "versionArgs": [
+    "--version"
+  ],
+  "helpProbes": [
+    [
+      "--help"
+    ]
+  ],
+  "knownHiddenFlags": [],
+  "authProbe": null,
+  "installHint": "npm install -g @github/copilot",
+  "effortValues": [
+    "none",
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max"
+  ],
+  "capabilities": {
+    "structuredOutput": "prompt",
+    "model": true,
+    "effort": true,
+    "resume": true,
+    "budgetUsd": false,
+    "finalMessageFile": false,
+    "readOnlyEnforcement": "tool-allowlist"
+  },
+  "invocation": {
+    "promptVia": "stdin",
+    "baseArgs": [
+      "--output-format",
+      "json",
+      "--no-ask-user",
+      "--no-auto-update",
+      "-C",
+      "{cwd}"
+    ],
+    "reviewArgs": [
+      "--allow-all-tools",
+      "--deny-tool=write",
+      "--deny-tool=shell"
+    ],
+    "writeArgs": [
+      "--allow-all-tools"
+    ],
+    "resumeExtraArgs": [
+      "--resume={session}"
+    ],
+    "modelArgs": [
+      "--model",
+      "{model}"
+    ],
+    "effortArgs": [
+      "--effort",
+      "{effort}"
+    ],
+    "schemaArgs": [],
+    "finalMessageArgs": [],
+    "budgetArgs": [],
+    "promptArgs": []
+  }
+}

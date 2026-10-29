@@ -5,17 +5,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { parseArgs, parseDuration } from "../src/lib/args.mjs";
-import { createCapture, lastJsonObject, parseProviderOutput, stripAnsi } from "../src/lib/parse.mjs";
-import { interpretVerdict, loadSchema, validate } from "../src/lib/schema.mjs";
-import { buildInvocationArgs, composePrompt } from "../src/lib/invocation.mjs";
-import { diffText, resolveScope } from "../src/lib/git.mjs";
-import { isSecretName, prepareExecutionRoot } from "../src/lib/isolation.mjs";
-import { resolveExecutable } from "../src/lib/exec.mjs";
-import { renderResult, renderRunsDashboard } from "../src/lib/render.mjs";
-import { buildHandoffDigest } from "../src/lib/transfer.mjs";
-import { listAllRuns, readJobTails } from "../src/lib/jobs.mjs";
-import { auditFlags, inspectConnector } from "../src/lib/setup.mjs";
+import { parseArgs, parseDuration } from "../plugins/polyglot/bin/lib/args.mjs";
+import { createCapture, lastJsonObject, parseProviderOutput, stripAnsi } from "../plugins/polyglot/bin/lib/parse.mjs";
+import { interpretVerdict, loadSchema, validate } from "../plugins/polyglot/bin/lib/schema.mjs";
+import { buildInvocationArgs, composePrompt } from "../plugins/polyglot/bin/lib/invocation.mjs";
+import { diffText, resolveScope } from "../plugins/polyglot/bin/lib/git.mjs";
+import { isSecretName, prepareExecutionRoot } from "../plugins/polyglot/bin/lib/isolation.mjs";
+import { resolveExecutable } from "../plugins/polyglot/bin/lib/exec.mjs";
+import { renderResult, renderRunsDashboard } from "../plugins/polyglot/bin/lib/render.mjs";
+import { buildHandoffDigest } from "../plugins/polyglot/bin/lib/transfer.mjs";
+import { jobPaths, listJobs, readJobTails, updateJob } from "../plugins/polyglot/bin/lib/jobs.mjs";
+import { auditFlags, inspectConnector } from "../plugins/polyglot/bin/lib/setup.mjs";
 
 async function scratch(name) {
   return mkdtemp(join(tmpdir(), `polyglot-${name}-`));
@@ -25,9 +25,9 @@ function git(cwd, args) {
   return spawnSync("git", args, { cwd, encoding: "utf8", windowsHide: true });
 }
 
-async function connectorConfig(pluginName) {
+async function connectorConfig(id) {
   return JSON.parse(
-    await readFile(new URL(`../plugins/${pluginName}/connector.json`, import.meta.url), "utf8"),
+    await readFile(new URL(`../plugins/polyglot/bin/providers/${id}.json`, import.meta.url), "utf8"),
   );
 }
 
@@ -206,7 +206,7 @@ test("provider text quoting a denial phrase is not treated as a denial", () => {
 });
 
 test("argument groups are all-or-nothing so a missing value never shifts the command line", async () => {
-  const config = await connectorConfig("codex-connector");
+  const config = await connectorConfig("codex");
   const withoutModel = buildInvocationArgs(config, {
     executionCwd: "/w",
     prompt: "p",
@@ -224,7 +224,9 @@ test("argument groups are all-or-nothing so a missing value never shifts the com
   assert.deepEqual(withoutModel.args.slice(0, 7), [
     "exec", "--json", "--skip-git-repo-check", "-C", "/w", "--sandbox", "read-only",
   ]);
-  assert.equal(withoutModel.args.at(-1), "p");
+  // The prompt travels on stdin; "-" tells codex exec to read it.
+  assert.equal(withoutModel.args.at(-1), "-");
+  assert.ok(!withoutModel.args.includes("p"));
 
   const full = buildInvocationArgs(config, {
     executionCwd: "/w",
@@ -245,7 +247,7 @@ test("argument groups are all-or-nothing so a missing value never shifts the com
 });
 
 test("codex review-mode resume carries the sandbox through -c", async () => {
-  const config = await connectorConfig("codex-connector");
+  const config = await connectorConfig("codex");
   const resumed = buildInvocationArgs(config, {
     executionCwd: "/w",
     prompt: "follow up",
@@ -263,7 +265,7 @@ test("codex review-mode resume carries the sandbox through -c", async () => {
 });
 
 test("grok review mode denies the write and shell tools by their real names", async () => {
-  const config = await connectorConfig("grok-connector");
+  const config = await connectorConfig("grok");
   const review = buildInvocationArgs(config, {
     executionCwd: "/w",
     prompt: "p",
@@ -444,20 +446,20 @@ test("shim resolution skips the node.exe interpreter and returns the real entryp
 // R2: the orchestration journal is append-only NDJSON, in order, resumable.
 test("event journal appends NDJSON lines and reads them back in order", async () => {
   const dir = await mkdtemp(join(tmpdir(), "polyglot-events-"));
-  const { appendEvent, readEvents, jobPaths } = await import("../src/lib/jobs.mjs");
-  await appendEvent("codex", "job-1", "job-started", { mode: "review" }, dir);
-  await appendEvent("codex", "job-1", "child-spawned", { pid: 123 }, dir);
-  await appendEvent("codex", "job-1", "finished", { status: "COMPLETED" }, dir);
+  const { appendEvent, readEvents } = await import("../plugins/polyglot/bin/lib/jobs.mjs");
+  await appendEvent("job-1", "job-started", { mode: "review" }, dir);
+  await appendEvent("job-1", "child-spawned", { pid: 123 }, dir);
+  await appendEvent("job-1", "finished", { status: "COMPLETED" }, dir);
 
-  const { events, offset } = await readEvents("codex", "job-1", {}, dir);
+  const { events, offset } = await readEvents("job-1", {}, dir);
   assert.deepEqual(events.map((event) => event.kind), ["job-started", "child-spawned", "finished"]);
   assert.equal(events[1].pid, 123);
   assert.ok(events.every((event) => event.ts && event.jobId === "job-1"));
 
   // Incremental read: from the previous offset, nothing new; then one more.
-  assert.deepEqual((await readEvents("codex", "job-1", { offset }, dir)).events, []);
-  await appendEvent("codex", "job-1", "cleanup-done", { failed: false }, dir);
-  const follow = await readEvents("codex", "job-1", { offset }, dir);
+  assert.deepEqual((await readEvents("job-1", { offset }, dir)).events, []);
+  await appendEvent("job-1", "cleanup-done", { failed: false }, dir);
+  const follow = await readEvents("job-1", { offset }, dir);
   assert.deepEqual(follow.events.map((event) => event.kind), ["cleanup-done"]);
 });
 
@@ -528,7 +530,7 @@ test("a handoff refuses a transcript outside the host directory", async () => {
   );
 });
 
-test("listAllRuns aggregates and sorts jobs across multiple connector state directories", async () => {
+test("listJobs aggregates and sorts jobs across providers", async () => {
   const home = await scratch("runs-state");
   const connectors = ["codex", "claude", "grok", "agy", "copilot"];
   
@@ -536,7 +538,7 @@ test("listAllRuns aggregates and sorts jobs across multiple connector state dire
   for (let i = 0; i < connectors.length; i++) {
     const connector = connectors[i];
     const jobId = `${connector}-job-${i}`;
-    const jobDir = join(home, connector, "jobs", jobId);
+    const jobDir = join(home, "jobs", jobId);
     await mkdir(jobDir, { recursive: true });
     await writeFile(
       join(jobDir, "job.json"),
@@ -563,7 +565,7 @@ test("listAllRuns aggregates and sorts jobs across multiple connector state dire
   }
 
   // 1. Unscoped (all: true) - returns all 5 jobs sorted by createdAt desc
-  const allRuns = await listAllRuns({ all: true, stateHome: home });
+  const allRuns = await listJobs({ all: true, stateHome: home });
   assert.equal(allRuns.length, 5);
   assert.equal(allRuns[0].connector, "copilot"); // newest
   assert.equal(allRuns[4].connector, "codex");   // oldest
@@ -575,19 +577,19 @@ test("listAllRuns aggregates and sorts jobs across multiple connector state dire
   assert.ok(runningJob.liveDurationMs > 0);
 
   // 2. Scoped by repositoryRoot
-  const scopedRuns = await listAllRuns({ repositoryRoot: "/repo/alpha", all: false, stateHome: home });
+  const scopedRuns = await listJobs({ repositoryRoot: "/repo/alpha", all: false, stateHome: home });
   assert.equal(scopedRuns.length, 3);
   assert.ok(scopedRuns.every((j) => j.repositoryRoot === "/repo/alpha"));
 
   // 3. Non-existent state directory returns empty array
-  const emptyRuns = await listAllRuns({ stateHome: join(home, "non-existent") });
+  const emptyRuns = await listJobs({ stateHome: join(home, "non-existent") });
   assert.deepEqual(emptyRuns, []);
 });
 
 test("readJobTails extracts bounded lines from stdout and stderr logs", async () => {
   const home = await scratch("tails-state");
   const jobId = "tail-test-job-1";
-  const jobDir = join(home, "codex", "jobs", jobId);
+  const jobDir = join(home, "jobs", jobId);
   await mkdir(jobDir, { recursive: true });
 
   // Generate 25 lines of stdout and 20 lines of stderr
@@ -597,14 +599,14 @@ test("readJobTails extracts bounded lines from stdout and stderr logs", async ()
   await writeFile(join(jobDir, "provider.stdout.ndjson"), stdoutLines, "utf8");
   await writeFile(join(jobDir, "provider.stderr.log"), stderrLines, "utf8");
 
-  const tails = await readJobTails("codex", jobId, { lines: 5, stateHome: home });
+  const tails = await readJobTails(jobId, { lines: 5, stateHome: home });
   assert.equal(tails.stdoutTail.split("\n").filter(Boolean).length, 5);
   assert.equal(tails.stderrTail.split("\n").filter(Boolean).length, 5);
   assert.ok(tails.stdoutTail.includes('"index":25'));
   assert.ok(tails.stderrTail.includes("[LOG 20]"));
 
   // Missing files return empty strings
-  const missingTails = await readJobTails("codex", "non-existent-job", { stateHome: home });
+  const missingTails = await readJobTails("non-existent-job", { stateHome: home });
   assert.equal(missingTails.stdoutTail, "");
   assert.equal(missingTails.stderrTail, "");
 });
@@ -636,7 +638,7 @@ test("renderRunsDashboard formats a valid Markdown table and sanitizes prompt pr
   ];
 
   const markdown = renderRunsDashboard(jobs);
-  assert.ok(markdown.includes("| connector | job | status | pid | model | duration | stream | scope | prompt |"));
+  assert.ok(markdown.includes("| provider | job | status | pid | model | duration | cost | stream | scope | prompt |"));
   assert.ok(markdown.includes("| --- | --- | --- | --- | --- | --- | --- | --- |"));
   assert.ok(markdown.includes("| codex | `codex-12345` | RUNNING | 1234 | gpt-5.4-mini |"));
   assert.ok(markdown.includes("| claude | `claude-67890` | COMPLETED | — | claude-sonnet-5 |"));
@@ -644,7 +646,7 @@ test("renderRunsDashboard formats a valid Markdown table and sanitizes prompt pr
   assert.ok(!markdown.includes("\nand check edge cases"));
   
   // Empty state rendering
-  assert.equal(renderRunsDashboard([]), "No runs recorded across connectors.");
+  assert.equal(renderRunsDashboard([]), "No runs recorded.");
 });
 
 test("stripAnsi removes ANSI escape color sequences and formatting", () => {
@@ -909,3 +911,33 @@ Options:
   assert.ok(!mismatchAudit.missing.includes("--hidden-beta-flag"));
 });
 
+
+test("a terminal status is sticky and concurrent updates never lose a write", async () => {
+  const home = await scratch("sticky-state");
+  const jobId = "codex-sticky-1";
+  await mkdir(jobPaths(jobId, home).directory, { recursive: true });
+  await updateJob(jobId, { status: "RUNNING", completed: false }, home);
+  // Fire-and-forget heartbeats racing the final write, as the worker does.
+  const heartbeats = Array.from({ length: 20 }, (_, index) => updateJob(jobId, { stdoutBytes: index }, home));
+  await updateJob(jobId, { status: "COMPLETED", completed: true }, home);
+  await Promise.all(heartbeats);
+  const late = await updateJob(jobId, { status: "RUNNING", stdoutBytes: 99 }, home);
+  assert.equal(late.status, "COMPLETED");
+  assert.equal(late.completed, true);
+  assert.equal(late.stdoutBytes, 99);
+});
+
+test("job ids cannot escape the state directory", () => {
+  assert.throws(() => jobPaths("../../etc"), /Invalid job id/);
+  assert.throws(() => jobPaths(""), /Invalid job id/);
+});
+
+test("the runs dashboard totals statuses and cost", () => {
+  const markdown = renderRunsDashboard([
+    { connector: "codex", jobId: "a", status: "COMPLETED", costUsd: 0.5 },
+    { connector: "claude", jobId: "b", status: "COMPLETED", costUsd: 0.25 },
+    { connector: "grok", jobId: "c", status: "FAILED" },
+  ]);
+  assert.match(markdown, /\*\*3 jobs\*\* — COMPLETED 2 · FAILED 1 · \$0\.7500/);
+  assert.match(markdown, /\| \$0\.5000 \|/);
+});

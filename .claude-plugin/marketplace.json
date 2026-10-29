@@ -4,105 +4,21 @@
     "name": "Polyglot Connectors contributors"
   },
   "metadata": {
-    "description": "Cross-host local CLI connectors for Codex, Grok Build, Antigravity and Claude Code.",
-    "version": "0.3.0"
+    "description": "One local plugin that delegates to seven agent CLIs.",
+    "version": "0.4.0"
   },
   "interface": {
     "displayName": "Polyglot Agent Connectors"
   },
   "plugins": [
     {
-      "name": "codex-connector",
-      "description": "Delegate bounded, git-scoped review and coding tasks to the local Codex CLI from Codex, Claude Code, Grok Build, or Antigravity.",
-      "version": "0.3.0",
+      "name": "polyglot",
+      "description": "Delegate git-scoped reviews and bounded coding tasks to any local agent CLI (Codex, Claude Code, Grok Build, Antigravity, Copilot, Qwen Code, OpenCode), track every job, and wait for results.",
+      "version": "0.4.0",
       "author": {
         "name": "Polyglot Connectors contributors"
       },
-      "source": "./plugins/codex-connector",
-      "policy": {
-        "installation": "AVAILABLE",
-        "authentication": "ON_USE"
-      },
-      "category": "Developer Tools"
-    },
-    {
-      "name": "grok-connector",
-      "description": "Delegate bounded, git-scoped review and coding tasks to the local Grok Build CLI from Codex, Claude Code, Grok Build, or Antigravity.",
-      "version": "0.3.0",
-      "author": {
-        "name": "Polyglot Connectors contributors"
-      },
-      "source": "./plugins/grok-connector",
-      "policy": {
-        "installation": "AVAILABLE",
-        "authentication": "ON_USE"
-      },
-      "category": "Developer Tools"
-    },
-    {
-      "name": "agy-connector",
-      "description": "Delegate bounded, git-scoped review and coding tasks to the local Antigravity CLI from Codex, Claude Code, Grok Build, or Antigravity.",
-      "version": "0.3.0",
-      "author": {
-        "name": "Polyglot Connectors contributors"
-      },
-      "source": "./plugins/agy-connector",
-      "policy": {
-        "installation": "AVAILABLE",
-        "authentication": "ON_USE"
-      },
-      "category": "Developer Tools"
-    },
-    {
-      "name": "claude-connector",
-      "description": "Delegate bounded, git-scoped review and coding tasks to the local Claude Code CLI from Codex, Claude Code, Grok Build, or Antigravity.",
-      "version": "0.3.0",
-      "author": {
-        "name": "Polyglot Connectors contributors"
-      },
-      "source": "./plugins/claude-connector",
-      "policy": {
-        "installation": "AVAILABLE",
-        "authentication": "ON_USE"
-      },
-      "category": "Developer Tools"
-    },
-    {
-      "name": "qwen-connector",
-      "description": "Delegate bounded, git-scoped review and coding tasks to the local Qwen Code CLI from Codex, Claude Code, Grok Build, or Antigravity.",
-      "version": "0.3.0",
-      "author": {
-        "name": "Polyglot Connectors contributors"
-      },
-      "source": "./plugins/qwen-connector",
-      "policy": {
-        "installation": "AVAILABLE",
-        "authentication": "ON_USE"
-      },
-      "category": "Developer Tools"
-    },
-    {
-      "name": "opencode-connector",
-      "description": "Delegate bounded, git-scoped review and coding tasks to the local OpenCode CLI from Codex, Claude Code, Grok Build, or Antigravity.",
-      "version": "0.3.0",
-      "author": {
-        "name": "Polyglot Connectors contributors"
-      },
-      "source": "./plugins/opencode-connector",
-      "policy": {
-        "installation": "AVAILABLE",
-        "authentication": "ON_USE"
-      },
-      "category": "Developer Tools"
-    },
-    {
-      "name": "copilot-connector",
-      "description": "Delegate bounded, git-scoped review and coding tasks to the local Copilot CLI from Codex, Claude Code, Grok Build, or Antigravity.",
-      "version": "0.3.0",
-      "author": {
-        "name": "Polyglot Connectors contributors"
-      },
-      "source": "./plugins/copilot-connector",
+      "source": "./plugins/polyglot",
       "policy": {
         "installation": "AVAILABLE",
         "authentication": "ON_USE"

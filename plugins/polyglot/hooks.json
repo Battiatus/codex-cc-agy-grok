@@ -1,0 +1,11 @@
+{
+  "polyglot-session": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "node ./bin/session-hook.mjs SessionStart",
+        "timeout": 5
+      }
+    ]
+  }
+}

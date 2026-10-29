@@ -9,10 +9,10 @@ import test from "node:test";
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const mockProvider = join(repositoryRoot, "tests", "mock-provider.mjs");
 const CONNECTORS = ["codex", "grok", "agy", "claude"];
-
-function bridgeFor(connector) {
-  return join(repositoryRoot, "plugins", `${connector}-connector`, "bin", "agent-bridge.mjs");
-}
+const bridge = join(repositoryRoot, "plugins", "polyglot", "bin", "agent-bridge.mjs");
+const PROVIDER_COMMANDS = new Set([
+  "run", "review", "adversarial-review", "rescue", "resume", "handoff", "setup", "capabilities", "doctor",
+]);
 
 async function scratch(name) {
   return mkdtemp(join(tmpdir(), `polyglot-e2e-${name}-`));
@@ -36,9 +36,13 @@ async function repositoryWithChange({ dirty = true } = {}) {
   return directory;
 }
 
+// The connector argument becomes --to for the commands that target a provider;
+// job-id commands (status, result, wait, cancel, runs) take none.
 async function runBridge(connector, args, { env = {}, home = null } = {}) {
   const stateHome = home || (await scratch("state"));
-  const result = spawnSync(process.execPath, [bridgeFor(connector), ...args], {
+  const [command, ...rest] = args;
+  const argv = PROVIDER_COMMANDS.has(command) && connector ? [command, "--to", connector, ...rest] : args;
+  const result = spawnSync(process.execPath, [bridge, ...argv], {
     cwd: repositoryRoot,
     encoding: "utf8",
     windowsHide: true,
@@ -172,15 +176,15 @@ test("an exact-response assertion still fails closed", async () => {
   assert.equal(mismatched.parsed.completed, false);
 });
 
-test("write mode is gated, records a rollback ref and lists changed files", async () => {
-  const directory = await repositoryWithChange({ dirty: false });
+test("write mode is gated and lands on a branch, never in the working tree", async () => {
+  const directory = await repositoryWithChange({ dirty: true });
   const ungated = await runBridge("codex", [
     "run", "--cwd", directory, "--prompt", "edit", "--mode", "write", "--timeout", "60s",
   ]);
   assert.equal(ungated.parsed, null);
   assert.match(ungated.stderr, /requires the explicit --confirm-write flag/);
 
-  const { parsed } = await runBridge(
+  const { parsed, stateHome } = await runBridge(
     "codex",
     [
       "run", "--cwd", directory, "--prompt", "edit",
@@ -189,10 +193,41 @@ test("write mode is gated, records a rollback ref and lists changed files", asyn
     { env: { MOCK_WRITE: "1", MOCK_TEXT: "done" } },
   );
   assert.equal(parsed.mode, "write");
-  assert.equal(parsed.isolationStrategy, "source-workspace");
-  assert.ok(parsed.filesChanged.includes("mutated-by-provider.txt"));
-  assert.ok(await stat(join(directory, "mutated-by-provider.txt")));
+  assert.equal(parsed.isolationStrategy, "git-worktree-branch");
+  assert.equal(parsed.branch, `polyglot/${parsed.jobId}`);
+  // Exactly the agent's change: the user's pre-existing math.js edit is not in it.
+  assert.deepEqual(parsed.filesChanged, ["mutated-by-provider.txt"]);
+  await assert.rejects(stat(join(directory, "mutated-by-provider.txt")), "the working tree is untouched");
+  assert.equal(await readFile(join(directory, "math.js"), "utf8"), "export const add = (a, b) => a - b;\n");
+  assert.equal(git(directory, ["show", `${parsed.branch}:mutated-by-provider.txt`]).stdout, "codex");
+  assert.equal(git(directory, ["worktree", "list"]).stdout.trim().split("\n").length, 1, "the worktree is removed");
   assert.equal(parsed.scope, null);
+
+  const markdown = await runBridge(null, ["result", parsed.jobId, "--format", "markdown"], { home: stateHome });
+  assert.match(markdown.stdout, /git diff [0-9a-f]{12} polyglot\//);
+});
+
+test("a write job that changes nothing leaves no branch behind", async () => {
+  const directory = await repositoryWithChange({ dirty: false });
+  const { parsed } = await runBridge(
+    "codex",
+    ["run", "--cwd", directory, "--prompt", "noop", "--mode", "write", "--confirm-write", "--timeout", "60s"],
+    { env: { MOCK_TEXT: "nothing to do" } },
+  );
+  assert.equal(parsed.status, "COMPLETED");
+  assert.equal(parsed.branch, null);
+  assert.deepEqual(parsed.filesChanged, []);
+  assert.equal(git(directory, ["branch", "--list", "polyglot/*"]).stdout.trim(), "");
+});
+
+test("write mode outside a git repository is refused", async () => {
+  const directory = await scratch("no-git");
+  const { parsed } = await runBridge(
+    "codex",
+    ["run", "--cwd", directory, "--prompt", "edit", "--mode", "write", "--confirm-write", "--timeout", "60s"],
+  );
+  assert.equal(parsed.status, "FAILED");
+  assert.match(parsed.error, /needs a git repository/);
 });
 
 test("options the provider cannot honour are refused instead of ignored", async () => {
@@ -202,7 +237,7 @@ test("options the provider cannot honour are refused instead of ignored", async 
   ]);
   assert.match(budget.stderr, /does not support --max-budget-usd/);
 
-  const effort = await runBridge("agy", [
+  const effort = await runBridge("grok", [
     "run", "--cwd", directory, "--prompt", "x", "--effort", "xhigh",
   ]);
   assert.match(effort.stderr, /Unsupported effort: xhigh/);
@@ -250,17 +285,10 @@ test("a background job exposes status, result and per-repository scoping", { tim
   assert.equal(started.parsed.status, "QUEUED");
   const jobId = started.parsed.jobId;
 
-  let result = null;
-  for (let attempt = 0; attempt < 80; attempt += 1) {
-    const probe = await runBridge("codex", ["result", jobId], { home });
-    const status = probe.parsed?.status;
-    if (status && status !== "QUEUED" && status !== "RUNNING") {
-      result = probe.parsed;
-      break;
-    }
-    await new Promise((done) => setTimeout(done, 250));
-  }
-  assert.ok(result, "the background job must reach a terminal state");
+  const waited = await runBridge(null, ["wait", jobId, "--timeout", "60s"], { home });
+  assert.equal(waited.status, 0, "exit 0 when every job completed");
+  assert.equal(waited.parsed.done, true);
+  const result = waited.parsed.jobs[0];
   assert.equal(result.status, "COMPLETED");
   assert.equal(result.verdict, "needs-attention");
 
@@ -275,7 +303,7 @@ test("a background job exposes status, result and per-repository scoping", { tim
     ["status", "--cwd", directory, "--format", "markdown"],
     { home },
   );
-  assert.match(markdown.stdout, /\| job \| status \| verdict \|/);
+  assert.match(markdown.stdout, /\| provider \| job \| status \|/);
 });
 
 test("cancel is terminal and idempotent", { timeout: 20_000 }, async () => {
@@ -299,7 +327,7 @@ test("cancel is terminal and idempotent", { timeout: 20_000 }, async () => {
 test("a job whose worker disappeared is reaped instead of running forever", async () => {
   const home = await scratch("reap-state");
   const jobId = "codex-orphan-1";
-  const jobDirectory = join(home, "codex", "jobs", jobId);
+  const jobDirectory = join(home, "jobs", jobId);
   await mkdir(jobDirectory, { recursive: true });
   await writeFile(
     join(jobDirectory, "job.json"),
@@ -353,7 +381,7 @@ test("chain depth is capped and the chain is passed to the target", async () => 
     { env: { MOCK_ECHO_CHAIN: "1", AGENT_CONNECTOR_CHAIN: "claude" } },
   );
   const stderrLog = await readFile(
-    join(stateHome, "codex", "jobs", parsed.jobId, "provider.stderr.log"),
+    join(stateHome, "jobs", parsed.jobId, "provider.stderr.log"),
     "utf8",
   );
   assert.match(stderrLog, /CHAIN=claude,codex/);
@@ -373,6 +401,7 @@ test("non-ASCII provider output survives the round trip", async () => {
 
 test("setup reports real installation and authentication state", async () => {
   const { parsed } = await runBridge("claude", ["setup"]);
+  assert.equal(parsed.connector, "claude");
   assert.equal(parsed.installed, true);
   assert.equal(parsed.authenticated, true);
   assert.match(parsed.version, /mock-claude/);
@@ -403,7 +432,8 @@ test("unified runs dashboard aggregates background jobs across connectors in mar
 
   // 2. Query runs dashboard (default Markdown table)
   const dashboardMarkdown = await runBridge("codex", ["runs", "--cwd", directory, "--format", "markdown"], { home });
-  assert.match(dashboardMarkdown.stdout, /\| connector \| job \| status \| pid \| model \| duration \| stream \| scope \| prompt \|/);
+  assert.match(dashboardMarkdown.stdout, /\| provider \| job \| status \| pid \| model \| duration \| cost \| stream \| scope \| prompt \|/);
+  assert.match(dashboardMarkdown.stdout, /\*\*2 jobs\*\*/);
   assert.match(dashboardMarkdown.stdout, new RegExp(codexJobId));
   assert.match(dashboardMarkdown.stdout, new RegExp(grokJobId));
 
@@ -449,7 +479,7 @@ test("status command for a single job provides enriched metadata and log tails",
   assert.match(statusMarkdown.stdout, new RegExp(jobId));
 });
 
-for (const connector of ["codex", "claude", "grok", "agy", "copilot"]) {
+for (const connector of ["codex", "claude", "grok", "agy", "copilot", "qwen", "opencode"]) {
   test(`${connector}: adversarial-review generates Red Team prompt with --focus and returns schema-validated verdict`, async () => {
     const directory = await repositoryWithChange();
     const home = await scratch(`adv-${connector}`);
@@ -470,13 +500,13 @@ for (const connector of ["codex", "claude", "grok", "agy", "copilot"]) {
     assert.deepEqual(parsed.schemaErrors, []);
 
     // Inspect the stored job to verify Red Team prompt composition
-    const jobJsonPath = join(home, connector, "jobs", parsed.jobId, "job.json");
+    const jobJsonPath = join(home, "jobs", parsed.jobId, "job.json");
     const jobData = JSON.parse(await readFile(jobJsonPath, "utf8"));
     assert.match(jobData.prompt, /Conduct an adversarial Red Team code review focused on: security, boundary checks, input validation/);
     assert.match(jobData.prompt, /critical vulnerabilities, security defects, edge cases, exploit vectors/);
   });
 
-  test(`${connector}: rescue runs in write mode, captures rollbackRef, propagates error and test context`, async () => {
+  test(`${connector}: rescue writes on a branch and propagates error and test context`, async () => {
     const directory = await repositoryWithChange({ dirty: true });
     const home = await scratch(`rescue-${connector}`);
     const { parsed } = await runBridge(connector, [
@@ -485,17 +515,18 @@ for (const connector of ["codex", "claude", "grok", "agy", "copilot"]) {
       "--error", "TypeError: add is not a function\n    at test.js:10:5",
       "--test", "npm test",
       "--cwd", directory,
+      "--confirm-write",
       "--timeout", "60s",
     ], { home, env: { MOCK_WRITE: "1", MOCK_TEXT: "fixed calculations" } });
 
     assert.equal(parsed.status, "COMPLETED");
     assert.equal(parsed.completed, true);
     assert.equal(parsed.mode, "write");
-    assert.ok(parsed.filesChanged.includes("mutated-by-provider.txt"));
-    assert.ok(parsed.rollbackRef, "rollbackRef must be captured for write-mode rescue");
+    assert.deepEqual(parsed.filesChanged, ["mutated-by-provider.txt"]);
+    assert.equal(parsed.branch, `polyglot/${parsed.jobId}`);
 
     // Inspect the stored job to verify rescue prompt composition
-    const jobJsonPath = join(home, connector, "jobs", parsed.jobId, "job.json");
+    const jobJsonPath = join(home, "jobs", parsed.jobId, "job.json");
     const jobData = JSON.parse(await readFile(jobJsonPath, "utf8"));
     assert.match(jobData.prompt, /Rescue operation: fix broken calculations/);
     assert.match(jobData.prompt, /Error log \/ stack trace:\s+TypeError: add is not a function/);
@@ -525,41 +556,23 @@ test("adversarial-review and rescue support background execution and result retr
     "--prompt", "fix regression",
     "--error", "AssertionError: expected true",
     "--cwd", directory,
+    "--confirm-write",
     "--background",
     "--timeout", "60s",
   ], { home, env: { MOCK_WRITE: "1", MOCK_DELAY_MS: "300", MOCK_TEXT: "rescued" } });
   assert.equal(rescueStart.parsed.status, "QUEUED");
   const rescueJobId = rescueStart.parsed.jobId;
 
-  // Poll for adversarial-review completion
-  let advResult = null;
-  for (let attempt = 0; attempt < 80; attempt += 1) {
-    const probe = await runBridge("codex", ["result", advJobId], { home });
-    if (probe.parsed?.status === "COMPLETED") {
-      advResult = probe.parsed;
-      break;
-    }
-    await new Promise((done) => setTimeout(done, 250));
-  }
-  assert.ok(advResult);
+  const waited = await runBridge(null, ["wait", advJobId, rescueJobId, "--timeout", "60s"], { home });
+  assert.equal(waited.parsed.done, true);
+  const [advResult, rescueResult] = waited.parsed.jobs;
   assert.equal(advResult.status, "COMPLETED");
   assert.equal(advResult.mode, "review");
   assert.equal(advResult.verdict, "needs-attention");
 
-  // Poll for rescue completion
-  let rescueResult = null;
-  for (let attempt = 0; attempt < 80; attempt += 1) {
-    const probe = await runBridge("claude", ["result", rescueJobId], { home });
-    if (probe.parsed?.status === "COMPLETED") {
-      rescueResult = probe.parsed;
-      break;
-    }
-    await new Promise((done) => setTimeout(done, 250));
-  }
-  assert.ok(rescueResult);
   assert.equal(rescueResult.status, "COMPLETED");
   assert.equal(rescueResult.mode, "write");
-  assert.ok(rescueResult.rollbackRef);
+  assert.equal(rescueResult.branch, `polyglot/${rescueJobId}`);
 });
 
 test("live output streaming (--stream) pipes chunks to stdout and stderr while returning valid schema result", async () => {
@@ -576,7 +589,7 @@ test("live output streaming (--stream) pipes chunks to stdout and stderr while r
   assert.match(result.stdout, /codex-thread-1/);
   assert.match(result.stderr, /permission denied while opening provider cache/);
 
-  const jobs = await readdir(join(home, "codex", "jobs"));
+  const jobs = await readdir(join(home, "jobs"));
   const stored = await runBridge("codex", ["result", jobs[0]], { home });
   assert.equal(stored.parsed.status, "COMPLETED");
   assert.equal(stored.parsed.completed, true);
@@ -585,12 +598,150 @@ test("live output streaming (--stream) pipes chunks to stdout and stderr while r
   assert.match(result.stdout, /"status":\s*"COMPLETED"/);
 });
 
-test("every connector ships an identical bridge and library tree", async () => {
-  const reference = await readFile(join(repositoryRoot, "src", "bridge.mjs"), "utf8");
-  const libraryNames = (await readdir(join(repositoryRoot, "src", "lib"))).sort();
-  for (const connector of CONNECTORS) {
-    const pluginBin = join(repositoryRoot, "plugins", `${connector}-connector`, "bin");
-    assert.equal(await readFile(join(pluginBin, "agent-bridge.mjs"), "utf8"), reference);
-    assert.deepEqual((await readdir(join(pluginBin, "lib"))).sort(), libraryNames);
+test("a prompt far beyond the command-line limit reaches every provider intact, never as an argument", async () => {
+  const directory = await repositoryWithChange();
+  // 200 KB of diff: the size that used to fail with spawn ENAMETOOLONG.
+  await writeFile(join(directory, "math.js"), `${"// padding line for a large diff\n".repeat(6_000)}`, "utf8");
+  const providersDirectory = join(repositoryRoot, "plugins", "polyglot", "bin", "providers");
+  for (const file of (await readdir(providersDirectory)).filter((name) => name.endsWith(".json"))) {
+    const provider = JSON.parse(await readFile(join(providersDirectory, file), "utf8"));
+    const capture = await scratch(`prompt-${provider.id}`);
+    const { parsed } = await runBridge(
+      provider.id,
+      ["review", "--cwd", directory, "--timeout", "60s"],
+      { env: { MOCK_STDIN_PATH: join(capture, "stdin.txt"), MOCK_ECHO_ARGV: "1", MOCK_ARGV_PATH: join(capture, "argv.json") } },
+    );
+    assert.notEqual(parsed.status, "FAILED", `${provider.id}: ${parsed.error}`);
+    const argv = JSON.parse(await readFile(join(capture, "argv.json"), "utf8"));
+    const delivered = provider.invocation.promptVia === "file"
+      ? await readFile(argv[argv.indexOf("--prompt-file") + 1], "utf8")
+      : await readFile(join(capture, "stdin.txt"), "utf8");
+    assert.ok(delivered.length > 150_000, `${provider.id} must receive the full prompt`);
+    assert.match(delivered, /<<<DIFF/);
+    assert.ok(!argv.some((token) => token.includes("<<<DIFF")), `${provider.id} must not get the prompt as an argument`);
   }
+});
+
+test("rescue refuses to write without --confirm-write", async () => {
+  const directory = await repositoryWithChange();
+  const { parsed, stderr, status } = await runBridge("claude", ["rescue", "--cwd", directory, "--error", "boom"]);
+  assert.equal(parsed, null);
+  assert.equal(status, 1);
+  assert.match(stderr, /requires the explicit --confirm-write flag/);
+});
+
+test("an unknown provider is refused with the list of valid ones", async () => {
+  const { stderr, status } = await runBridge("../../etc", ["review"]);
+  assert.equal(status, 1);
+  assert.match(stderr, /Unknown provider: \.\.\/\.\.\/etc\. Expected one of agy, claude, codex/);
+});
+
+test("exit codes separate completed, not completed and still running", { timeout: 40_000 }, async () => {
+  const directory = await repositoryWithChange();
+  const completed = await runBridge("codex", ["review", "--cwd", directory, "--timeout", "60s"]);
+  assert.equal(completed.status, 0);
+
+  const violated = await runBridge("claude", ["review", "--cwd", directory, "--timeout", "60s"], { env: { MOCK_MALFORMED: "1" } });
+  assert.equal(violated.parsed.status, "SCHEMA_VIOLATION");
+  assert.equal(violated.status, 2);
+
+  const home = await scratch("wait-pending");
+  const slow = await runBridge(
+    "grok",
+    ["review", "--cwd", directory, "--background", "--timeout", "60s"],
+    { home, env: { MOCK_DELAY_MS: "30000" } },
+  );
+  const pending = await runBridge(null, ["wait", slow.parsed.jobId, "--timeout", "1s"], { home });
+  assert.equal(pending.status, 3);
+  assert.equal(pending.parsed.done, false);
+  assert.deepEqual(pending.parsed.pending, [slow.parsed.jobId]);
+  await runBridge(null, ["cancel", slow.parsed.jobId], { home });
+});
+
+test("canceling a write job discards its branch and worktree", { timeout: 30_000 }, async () => {
+  const directory = await repositoryWithChange();
+  const home = await scratch("cancel-write");
+  const started = await runBridge(
+    "codex",
+    ["run", "--cwd", directory, "--prompt", "edit", "--mode", "write", "--confirm-write", "--background", "--timeout", "60s"],
+    { home, env: { MOCK_DELAY_MS: "30000", MOCK_WRITE: "1" } },
+  );
+  const jobId = started.parsed.jobId;
+  // The worktree exists once the provider is running.
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    const probe = await runBridge(null, ["status", jobId], { home });
+    if (probe.parsed?.status === "RUNNING") break;
+    await new Promise((done) => setTimeout(done, 100));
+  }
+  const canceled = await runBridge(null, ["cancel", jobId], { home });
+  assert.equal(canceled.parsed.status, "CANCELED");
+  assert.equal(git(directory, ["branch", "--list", "polyglot/*"]).stdout.trim(), "");
+  assert.equal(git(directory, ["worktree", "list"]).stdout.trim().split("\n").length, 1);
+  const stored = await runBridge(null, ["status", jobId], { home });
+  assert.equal(stored.parsed.status, "CANCELED", "a terminal status is never overwritten");
+});
+
+test("a commit failure keeps the agent's work and fails the job instead of losing it", async () => {
+  const directory = await repositoryWithChange();
+  const { parsed, status } = await runBridge(
+    "codex",
+    ["run", "--cwd", directory, "--prompt", "edit", "--mode", "write", "--confirm-write", "--timeout", "60s"],
+    { env: { MOCK_WRITE: "1", MOCK_LOCK_INDEX: "1" } },
+  );
+  assert.equal(parsed.status, "FAILED");
+  assert.equal(status, 2);
+  assert.equal(parsed.phase, "commit");
+  assert.match(parsed.error, /kept in/);
+  assert.equal(await readFile(join(parsed.executionCwd, "mutated-by-provider.txt"), "utf8"), "codex");
+  assert.equal(parsed.branch, `polyglot/${parsed.jobId}`, "the branch is kept with the worktree");
+});
+
+test("a write job flags a provider that wrote the source tree", async () => {
+  const directory = await repositoryWithChange();
+  const { parsed, stateHome } = await runBridge(
+    "codex",
+    ["run", "--cwd", directory, "--prompt", "edit", "--mode", "write", "--confirm-write", "--timeout", "60s"],
+    { env: { MOCK_WRITE: "1", MOCK_WRITE_SOURCE: join(directory, "rogue.txt") } },
+  );
+  assert.equal(parsed.sourceTreeModified, true);
+  const markdown = await runBridge(null, ["result", parsed.jobId, "--format", "markdown"], { home: stateHome });
+  assert.match(markdown.stdout, /source working tree changed/);
+
+  const clean = await runBridge(
+    "codex",
+    ["run", "--cwd", directory, "--prompt", "edit", "--mode", "write", "--confirm-write", "--timeout", "60s"],
+    { env: { MOCK_WRITE: "1" } },
+  );
+  assert.equal(clean.parsed.sourceTreeModified, false);
+});
+
+test("a result written just before the worker died stands against the reaper and cancel", async () => {
+  const home = await scratch("settle-state");
+  for (const jobId of ["codex-settled-1", "codex-settled-2"]) {
+    const jobDirectory = join(home, "jobs", jobId);
+    await mkdir(jobDirectory, { recursive: true });
+    const base = { bridgeVersion: "0.4.0", connector: "codex", jobId, mode: "review", createdAt: new Date().toISOString() };
+    await writeFile(join(jobDirectory, "job.json"), JSON.stringify({
+      ...base, status: "RUNNING", completed: false, workerPid: 999_999_999, targetPid: 999_999_998,
+    }), "utf8");
+    await writeFile(join(jobDirectory, "result.json"), JSON.stringify({
+      ...base, status: "COMPLETED", completed: true, verdict: "approve", finishedAt: new Date().toISOString(),
+    }), "utf8");
+  }
+  const reaped = await runBridge(null, ["status", "codex-settled-1", "--reap"], { home });
+  assert.equal(reaped.parsed.status, "COMPLETED", "the reaper aligns to the stored result instead of STALE");
+
+  const canceled = await runBridge(null, ["cancel", "codex-settled-2"], { home });
+  assert.equal(canceled.parsed.status, "COMPLETED", "cancel does not overwrite a finished job");
+  const stored = await runBridge(null, ["result", "codex-settled-2"], { home });
+  assert.equal(stored.parsed.status, "COMPLETED");
+});
+
+test("a git ref that looks like an option is refused", async () => {
+  const directory = await repositoryWithChange();
+  const { stderr, status } = await runBridge("codex", [
+    "review", "--cwd", directory, "--scope", "commit", "--commit", "--output=pwned.txt",
+  ]);
+  assert.equal(status, 1);
+  assert.match(stderr, /Invalid --commit/);
 });
