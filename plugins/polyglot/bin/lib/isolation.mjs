@@ -176,6 +176,7 @@ export function writeTarget(jobId) {
   return { branch: `polyglot/${jobId}`, destination: join(isolationRoot(), jobId, "workspace") };
 }
 
+// Returns the branch deletion's git result.
 export function discardWriteTarget(cwd, jobId) {
   const { branch, destination } = writeTarget(jobId);
   if (!removeWorktree(cwd, destination).ok) {
@@ -187,7 +188,7 @@ export function discardWriteTarget(cwd, jobId) {
     }
     pruneWorktrees(cwd);
   }
-  deleteBranch(cwd, branch);
+  return deleteBranch(cwd, branch);
 }
 
 // A write job never touches the user's working tree: it runs in a worktree on
@@ -231,10 +232,11 @@ async function prepareWriteBranch({ cwd, jobId }) {
  * comes from the provider profile, git history stays available, and nothing
  * leaves the machine.
  * review with --isolate: a detached git worktree when possible, otherwise a
- * filtered copy that refuses credentials and gitignored files.
+ * filtered copy that refuses credentials and gitignored files. `ref` checks
+ * out that commit instead of the current state (reviewing another job's branch).
  * write: a worktree on a polyglot/<job> branch.
  */
-export async function prepareExecutionRoot({ mode, cwd, jobId, isolate = false }) {
+export async function prepareExecutionRoot({ mode, cwd, jobId, isolate = false, ref: explicitRef = null }) {
   if (mode === "write") return prepareWriteBranch({ cwd, jobId });
   if (!isolate) {
     return {
@@ -252,18 +254,19 @@ export async function prepareExecutionRoot({ mode, cwd, jobId, isolate = false }
   await rm(jobRoot, { recursive: true, force: true }).catch(() => {});
 
   if (isGitRepository(cwd)) {
-    const stashRef = stashCreate(cwd);
-    const ref = stashRef || head(cwd);
+    const stashRef = explicitRef ? null : stashCreate(cwd);
+    const ref = explicitRef || stashRef || head(cwd);
     if (ref) {
       await mkdir(jobRoot, { recursive: true });
       const created = addWorktree(cwd, destination, ref);
+      if (!created.ok && explicitRef) throw new Error(`git worktree add ${explicitRef} failed: ${created.stderr || created.error}`);
       if (created.ok) {
         return {
           executionCwd: destination,
           strategy: "git-worktree",
           exported: true,
           worktreeRef: ref,
-          omitted: stashRef ? [] : [{ path: "*", reason: "uncommitted-changes-not-in-HEAD" }],
+          omitted: explicitRef || stashRef ? [] : [{ path: "*", reason: "uncommitted-changes-not-in-HEAD" }],
           gitHistoryAvailable: true,
           cleanup: async () => {
             if (removeWorktree(cwd, destination).ok) return null;
@@ -274,6 +277,9 @@ export async function prepareExecutionRoot({ mode, cwd, jobId, isolate = false }
     }
   }
 
+  // A copy of the working tree is not the requested ref: reviewing it would
+  // review the wrong files.
+  if (explicitRef) throw new Error(`Cannot check out ${explicitRef}: ${cwd} is not a git repository.`);
   await mkdir(destination, { recursive: true });
   const omitted = await copyFiltered(cwd, destination);
   return {

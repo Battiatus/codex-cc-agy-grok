@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdir, mkdtemp, readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import test from "node:test";
+import test, { after } from "node:test";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const mockProvider = join(repositoryRoot, "tests", "mock-provider.mjs");
@@ -14,9 +14,16 @@ const PROVIDER_COMMANDS = new Set([
   "run", "review", "adversarial-review", "rescue", "resume", "handoff", "setup", "capabilities", "doctor",
 ]);
 
+const scratchDirectories = [];
+
 async function scratch(name) {
-  return mkdtemp(join(tmpdir(), `polyglot-e2e-${name}-`));
+  const directory = await mkdtemp(join(tmpdir(), `polyglot-e2e-${name}-`));
+  scratchDirectories.push(directory);
+  return directory;
 }
+
+after(() => Promise.all(scratchDirectories.map((directory) =>
+  rm(directory, { recursive: true, force: true, maxRetries: 3 }).catch(() => {}))));
 
 function git(cwd, args) {
   return spawnSync("git", args, { cwd, encoding: "utf8", windowsHide: true });
@@ -432,7 +439,7 @@ test("unified runs dashboard aggregates background jobs across connectors in mar
 
   // 2. Query runs dashboard (default Markdown table)
   const dashboardMarkdown = await runBridge("codex", ["runs", "--cwd", directory, "--format", "markdown"], { home });
-  assert.match(dashboardMarkdown.stdout, /\| provider \| job \| status \| pid \| model \| duration \| cost \| stream \| scope \| prompt \|/);
+  assert.match(dashboardMarkdown.stdout, /\| provider \| job \| status \| pid \| model \| duration \| cost \| activity \| scope \| prompt \|/);
   assert.match(dashboardMarkdown.stdout, /\*\*2 jobs\*\*/);
   assert.match(dashboardMarkdown.stdout, new RegExp(codexJobId));
   assert.match(dashboardMarkdown.stdout, new RegExp(grokJobId));
@@ -683,7 +690,7 @@ test("canceling a write job discards its branch and worktree", { timeout: 30_000
 
 test("a commit failure keeps the agent's work and fails the job instead of losing it", async () => {
   const directory = await repositoryWithChange();
-  const { parsed, status } = await runBridge(
+  const { parsed, status, stateHome } = await runBridge(
     "codex",
     ["run", "--cwd", directory, "--prompt", "edit", "--mode", "write", "--confirm-write", "--timeout", "60s"],
     { env: { MOCK_WRITE: "1", MOCK_LOCK_INDEX: "1" } },
@@ -694,6 +701,9 @@ test("a commit failure keeps the agent's work and fails the job instead of losin
   assert.match(parsed.error, /kept in/);
   assert.equal(await readFile(join(parsed.executionCwd, "mutated-by-provider.txt"), "utf8"), "codex");
   assert.equal(parsed.branch, `polyglot/${parsed.jobId}`, "the branch is kept with the worktree");
+  // The branch is still at its base: apply must not report an empty success.
+  const applied = await runBridge(null, ["apply", parsed.jobId], { home: stateHome });
+  assert.match(applied.stderr, /no committed change to apply/);
 });
 
 test("a write job flags a provider that wrote the source tree", async () => {
@@ -744,4 +754,172 @@ test("a git ref that looks like an option is refused", async () => {
   ]);
   assert.equal(status, 1);
   assert.match(stderr, /Invalid --commit/);
+});
+
+async function pollJob(home, jobId, predicate) {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const job = await readFile(join(home, "jobs", jobId, "job.json"), "utf8").then(JSON.parse, () => null);
+    if (job && predicate(job)) return job;
+    await new Promise((done) => setTimeout(done, 100));
+  }
+  throw new Error(`job ${jobId} never reached the expected state`);
+}
+
+function runHook(event, payload, home) {
+  return spawnSync(process.execPath, [join(repositoryRoot, "plugins", "polyglot", "bin", "session-hook.mjs"), event], {
+    input: JSON.stringify(payload),
+    encoding: "utf8",
+    windowsHide: true,
+    env: { ...process.env, AGENT_CONNECTOR_HOME: home },
+  });
+}
+
+const WRITE_JOB = ["run", "--prompt", "edit", "--mode", "write", "--confirm-write", "--timeout", "60s"];
+
+test("a running job shows the agent's current action while it works", { timeout: 30_000 }, async () => {
+  const directory = await repositoryWithChange();
+  const home = await scratch("live");
+  const started = await runBridge(
+    "agy",
+    ["review", "--cwd", directory, "--background", "--timeout", "60s"],
+    { home, env: { MOCK_DELAY_MS: "20000" } },
+  );
+  const jobId = started.parsed.jobId;
+  const job = await pollJob(home, jobId, (record) => record.progress?.lastAction);
+  assert.equal(job.progress.lastAction, "read_file math.js", "paths are shown relative to the workspace");
+  const status = await runBridge(null, ["status", jobId, "--format", "markdown"], { home });
+  assert.match(status.stdout, /\*\*Now:\*\* `read_file math\.js` \(1 action/);
+  const runs = await runBridge(null, ["runs", "--all", "--format", "markdown"], { home });
+  assert.match(runs.stdout, /\| RUNNING \|.*\| read_file math\.js/);
+  await runBridge(null, ["cancel", jobId], { home });
+});
+
+test("the next prompt hears about background jobs that finished, once", { timeout: 30_000 }, async () => {
+  const directory = await repositoryWithChange();
+  const home = await scratch("notify");
+  const started = await runBridge("codex", ["review", "--cwd", directory, "--background", "--timeout", "60s"], { home });
+  const jobId = started.parsed.jobId;
+  await pollJob(home, jobId, (record) => record.status === "COMPLETED");
+
+  assert.equal(runHook("UserPromptSubmit", { cwd: await scratch("elsewhere") }, home).stdout, "", "other repositories stay quiet");
+  const output = JSON.parse(runHook("UserPromptSubmit", { cwd: directory }, home).stdout).hookSpecificOutput;
+  assert.equal(output.hookEventName, "UserPromptSubmit");
+  assert.match(output.additionalContext, /1 delegated job finished/);
+  assert.ok(output.additionalContext.includes(`\`${jobId}\` · review · COMPLETED · verdict needs-attention · 1 finding (1 critical/high)`));
+  assert.equal(runHook("UserPromptSubmit", { cwd: directory }, home).stdout, "", "a job is announced once");
+
+  // A job the host already read is not news.
+  const read = await runBridge("codex", ["review", "--cwd", directory, "--background", "--timeout", "60s"], { home });
+  await runBridge(null, ["wait", read.parsed.jobId], { home });
+  assert.equal(runHook("UserPromptSubmit", { cwd: directory }, home).stdout, "");
+});
+
+test("apply brings a write job's branch into the working tree, all or nothing, and discard drops it", { timeout: 30_000 }, async () => {
+  const directory = await repositoryWithChange({ dirty: true });
+  const { parsed, stateHome: home } = await runBridge(
+    "codex",
+    [...WRITE_JOB, "--cwd", directory],
+    { env: { MOCK_WRITE: "1", MOCK_WRITE_LATIN1: "1" } },
+  );
+  const added = join(directory, "mutated-by-provider.txt");
+
+  await writeFile(added, "mine", "utf8");
+  const clash = await runBridge(null, ["apply", parsed.jobId], { home });
+  assert.equal(clash.status, 1);
+  assert.match(clash.stderr, /Nothing was applied/);
+  assert.equal(await readFile(added, "utf8"), "mine", "a clash changes nothing");
+  await rm(added);
+
+  const applied = await runBridge(null, ["apply", parsed.jobId], { home });
+  assert.equal(applied.parsed.action, "applied");
+  assert.equal(await readFile(added, "utf8"), "codex");
+  assert.deepEqual([...await readFile(join(directory, "latin1.txt"))], [0x63, 0x61, 0x66, 0xe9], "bytes survive, not just UTF-8");
+  assert.equal(await readFile(join(directory, "math.js"), "utf8"), "export const add = (a, b) => a - b;\n", "local edits are kept");
+  assert.match((await runBridge(null, ["apply", parsed.jobId], { home })).stderr, /already applied/);
+
+  const discarded = await runBridge(null, ["discard", parsed.jobId], { home });
+  assert.equal(discarded.parsed.action, "discarded");
+  assert.equal(git(directory, ["branch", "--list", "polyglot/*"]).stdout.trim(), "");
+  assert.match((await runBridge(null, ["apply", parsed.jobId], { home })).stderr, /no branch to apply/);
+});
+
+test("retry replays a job, on another provider if asked, and continue resumes its session", { timeout: 40_000 }, async () => {
+  const directory = await repositoryWithChange();
+  const home = await scratch("retry");
+  const failed = await runBridge("claude", ["review", "--cwd", directory, "--timeout", "60s"], { home, env: { MOCK_MALFORMED: "1" } });
+  assert.equal(failed.parsed.status, "SCHEMA_VIOLATION");
+
+  const retried = await runBridge(null, ["retry", failed.parsed.jobId, "--to", "grok"], { home });
+  assert.equal(retried.parsed.connector, "grok");
+  assert.equal(retried.parsed.status, "COMPLETED");
+  assert.equal(retried.parsed.scope.kind, "uncommitted", "the original directory and scope come along");
+  const record = JSON.parse(await readFile(join(home, "jobs", retried.parsed.jobId, "job.json"), "utf8"));
+  assert.equal(record.retryOf, failed.parsed.jobId);
+
+  const write = await runBridge("codex", [...WRITE_JOB, "--cwd", directory], { home, env: { MOCK_TEXT: "done" } });
+  assert.match((await runBridge(null, ["retry", write.parsed.jobId], { home })).stderr, /--confirm-write/);
+  assert.match(
+    (await runBridge(null, ["continue", write.parsed.jobId, "--prompt", "more"], { home })).stderr,
+    /temporary worktree/,
+    "a session that ran in a removed worktree is not resumed",
+  );
+
+  const argvPath = join(home, "argv.json");
+  const continued = await runBridge(
+    null,
+    ["continue", failed.parsed.jobId, "--prompt", "and the tests?"],
+    { home, env: { MOCK_ECHO_ARGV: "1", MOCK_ARGV_PATH: argvPath, MOCK_TEXT: "fine" } },
+  );
+  assert.equal(continued.parsed.connector, "claude");
+  assert.equal(continued.parsed.status, "COMPLETED");
+  const argv = JSON.parse(await readFile(argvPath, "utf8"));
+  const resumeAt = argv.indexOf("--resume");
+  assert.deepEqual(argv.slice(resumeAt, resumeAt + 2), ["--resume", "claude-session-1"]);
+});
+
+test("another agent reviews a write job's branch in a worktree of that branch", { timeout: 30_000 }, async () => {
+  const directory = await repositoryWithChange();
+  const write = await runBridge("codex", [...WRITE_JOB, "--cwd", directory], { env: { MOCK_WRITE: "1", MOCK_TEXT: "done" } });
+  const review = await runBridge("claude", ["review", "--job", write.parsed.jobId, "--timeout", "60s"], { home: write.stateHome });
+  assert.equal(review.parsed.status, "COMPLETED");
+  assert.equal(review.parsed.scope.kind, "commit");
+  assert.equal(review.parsed.scope.commit, write.parsed.branch);
+  assert.equal(review.parsed.scope.base, write.parsed.baseRef, "the whole branch from its base, as apply sees it");
+  assert.equal(review.parsed.scope.fileCount, 1);
+  assert.equal(review.parsed.isolationStrategy, "git-worktree");
+  const prompt = await readFile(review.parsed.promptComposedPath, "utf8");
+  assert.match(prompt, /mutated-by-provider\.txt/);
+  assert.match(prompt, /another agent \(codex\) made for this task:\nedit/);
+});
+
+test("--to auto routes to the provider with the best recent record, and runs --stats shows it", { timeout: 30_000 }, async () => {
+  const directory = await repositoryWithChange();
+  const home = await scratch("auto");
+  const history = [["codex", "FAILED"], ["codex", "TIMEOUT"], ["grok", "COMPLETED"], ["grok", "COMPLETED"]];
+  for (const [index, [connector, status]] of history.entries()) {
+    const jobId = `${connector}-history-${index}`;
+    await mkdir(join(home, "jobs", jobId), { recursive: true });
+    await writeFile(join(home, "jobs", jobId, "job.json"), JSON.stringify({
+      connector, jobId, status, completed: status === "COMPLETED", durationMs: 1_000,
+      createdAt: new Date(Date.now() - 60_000 + index).toISOString(),
+    }), "utf8");
+  }
+  const routed = await runBridge(null, ["review", "--to", "auto", "--cwd", directory, "--timeout", "60s"], { home, env: { CLAUDECODE: "" } });
+  assert.equal(routed.parsed.connector, "grok");
+  const record = JSON.parse(await readFile(join(home, "jobs", routed.parsed.jobId, "job.json"), "utf8"));
+  assert.equal(record.autoRouted, true);
+  assert.equal(record.launch.options.to, "auto", "a retry routes again");
+
+  // A second opinion never goes back to the job's author, even the best one.
+  const write = await runBridge("grok", [...WRITE_JOB, "--cwd", directory], { home, env: { MOCK_WRITE: "1", MOCK_TEXT: "done" } });
+  const second = await runBridge(null, ["review", "--to", "auto", "--job", write.parsed.jobId, "--timeout", "60s"], { home, env: { CLAUDECODE: "" } });
+  assert.notEqual(second.parsed.connector, "grok");
+  assert.match(
+    (await runBridge(null, ["resume", "--to", "auto", "--session", "s", "--prompt", "x"], { home })).stderr,
+    /cannot resume a session/,
+  );
+
+  const stats = await runBridge(null, ["runs", "--stats", "--format", "markdown"], { home });
+  assert.match(stats.stdout, /\| grok \| 4 \| 4 \| 100% \|/);
+  assert.match(stats.stdout, /\| codex \| 2 \| 0 \| 0% \| — \| — \| (FAILED|TIMEOUT) ×1 \|/);
 });

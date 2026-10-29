@@ -1,6 +1,6 @@
 ---
 description: Hand this conversation's context to another agent CLI as a derived digest and continue the work there
-argument-hint: '--to codex|claude|grok|agy|copilot|qwen|opencode [--from-host claude|codex|grok|agy] [--source <transcript>] <task>'
+argument-hint: '--to auto|codex|claude|grok|agy|copilot|qwen|opencode [--from-host claude|codex|grok|agy] [--source <transcript>] <task>'
 allowed-tools: Bash(node:*), AskUserQuestion
 ---
 

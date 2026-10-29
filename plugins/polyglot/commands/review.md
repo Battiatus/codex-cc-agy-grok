@@ -1,6 +1,6 @@
 ---
 description: Review the current git scope with another agent CLI and return a schema-validated verdict
-argument-hint: '--to codex|claude|grok|agy|copilot|qwen|opencode [--scope auto|uncommitted|staged|branch|commit|workspace] [--base <ref>] [--commit <sha>] [--isolate] [--model <model>] [--effort <level>] [--timeout 10m]'
+argument-hint: '--to auto|codex|claude|grok|agy|copilot|qwen|opencode [--scope auto|uncommitted|staged|branch|commit|workspace] [--base <ref>] [--commit <sha>] [--isolate] [--model <model>] [--effort <level>] [--timeout 10m]'
 disable-model-invocation: true
 allowed-tools: Bash(node:*), Bash(git:*), AskUserQuestion
 ---
@@ -8,7 +8,8 @@ allowed-tools: Bash(node:*), Bash(git:*), AskUserQuestion
 Delegate a review through the bundled bridge. Raw arguments: `$ARGUMENTS`
 
 Rules:
-- If `--to` is missing, ask which provider with `AskUserQuestion`. Several providers means one job each.
+- If `--to` is missing, ask which provider with `AskUserQuestion` (`auto` picks the one with the best recent record). Several providers means one job each.
+- `--job <write-job-id>` reviews the branch another agent produced, in a worktree of that branch.
 - This command is review-only. Do not fix anything, do not edit any file, and do not offer to.
 - Never construct provider commands yourself.
 

@@ -42,7 +42,8 @@
     "baseArgs": [
       "-p",
       "--output-format",
-      "json",
+      "stream-json",
+      "--verbose",
       "--add-dir",
       "{cwd}"
     ],

@@ -5,13 +5,13 @@
   },
   "metadata": {
     "description": "One local plugin that delegates to seven agent CLIs.",
-    "version": "0.4.0"
+    "version": "0.5.0"
   },
   "plugins": [
     {
       "name": "polyglot",
       "description": "Delegate git-scoped reviews and bounded coding tasks to any local agent CLI (Codex, Claude Code, Grok Build, Antigravity, Copilot, Qwen Code, OpenCode), track every job, and wait for results.",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "author": {
         "name": "Polyglot Connectors contributors"
       },

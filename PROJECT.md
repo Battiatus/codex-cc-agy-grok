@@ -16,7 +16,14 @@ One plugin, one bridge: a symmetrical polyglot multi-agent bridge enabling deleg
 - **Job Store & Supervision (`bin/lib/jobs.mjs`, `bin/lib/provider.mjs`, `bin/lib/render.mjs`)**: Persistent job state under `~/.agent-connectors/jobs/<job-id>/` (override `AGENT_CONNECTOR_HOME`), NDJSON event journal, live process supervision, stale-job reaping, log tailing, `wait`, Markdown dashboard. Handoff transcripts are recorded per working directory under `~/.agent-connectors/sessions/`.
 - **Git & Isolation Layer (`bin/lib/git.mjs`, `bin/lib/isolation.mjs`)**: Git scope resolution; reviews run in place by default, `--isolate` uses a detached worktree or a credential-filtered copy; write jobs run in a worktree on a `polyglot/<job-id>` branch.
 - **Prompt & Invocation Engine (`bin/lib/invocation.mjs`, `bin/lib/parse.mjs`, `bin/lib/schema.mjs`)**: Diff-embedding prompt composition, argument building from provider configs, per-provider output parsing, review-schema validation.
-- **Plugin surface (`commands/`, `skills/delegate/`, `agents/delegate.md`, `hooks.json`)**: 11 slash commands (`/polyglot:review`, `adversarial-review`, `rescue`, `delegate`, `handoff`, `wait`, `runs`, `status`, `result`, `cancel`, `setup`), one `delegate` skill, one `delegate` agent, SessionStart/SessionEnd hooks.
+- **Plugin surface (`commands/`, `skills/delegate/`, `agents/delegate.md`, `hooks.json`)**: 15 slash commands (`/polyglot:review`, `adversarial-review`, `rescue`, `delegate`, `handoff`, `wait`, `runs`, `status`, `result`, `cancel`, `setup`, `apply`, `discard`, `retry`, `continue`), one `delegate` skill, one `delegate` agent, SessionStart, UserPromptSubmit and SessionEnd hooks.
+
+## v0.5.0 Changelog
+- Live progress: while a job runs, `status` and `runs` show the agent's current action (tool, file, command), its last five actions, and output tokens and cost so far, read from the provider's event stream (codex, claude, opencode, agy). Claude now runs with `--output-format stream-json --verbose`. Qwen stays on `json`: in stream-json mode it never exits after answering, so it has no live progress.
+- Notifications: a `UserPromptSubmit` hook tells the host, on its next prompt, which background jobs of the repository finished since it last read them (verdict, findings, branch, cost). Each job is announced once; `wait`, `result`, `status` and a foreground run count as read.
+- Job actions: `apply <job-id>` applies a write job's branch to the working tree (all or nothing), `discard <job-id>` deletes it, `retry <job-id> [--to <other>]` replays the launch (a write needs `--confirm-write` again), `continue <job-id> --prompt` resumes the provider session of a job that ran in place, `review --to <p> --job <write-job-id>` has another agent review everything from the job's base to its branch tip, in a worktree of that branch.
+- Routing: `--to auto` picks the installed, signed-in provider with the best completion rate over its last 20 jobs, skipping providers that do not support the options given, the delegation chain, Claude Code when it is the host, and with `--job` the job's author. `runs --stats` shows success rate, median time, cost and the usual failure per provider.
+- Unverified: whether Codex runs the `UserPromptSubmit` hook (Claude Code does).
 
 ## v0.4.0 Changelog
 - Seven per-provider plugins (`*-connector`) merged into the single `polyglot` plugin; providers are JSON configs.
@@ -41,12 +48,12 @@ One plugin, one bridge: a symmetrical polyglot multi-agent bridge enabling deleg
 ### Bridge ↔ Job Store
 - `listJobs({ all, repositoryRoot })`: returns jobs sorted by `createdAt` desc, with `liveDurationMs`, `hostPid`, `model`, `promptSummary`.
 - `readJobTails(jobId, { lines })`: returns `{ stdoutTail, stderrTail }`.
-- `renderRunsDashboard(runs)`: a totals line, then a Markdown table `| provider | job | status | pid | model | duration | cost | stream | scope | prompt |`.
+- `renderRunsDashboard(runs)`: a totals line, then a Markdown table `| provider | job | status | pid | model | duration | cost | activity | scope | prompt |`. `renderStats(stats)`: one row per provider (jobs, completed, success rate, median time, cost, top failure).
 - `wait`: returns `{ done, pending, jobs }`; each finished job is its full stored result.
 
 ### Bridge ↔ Write Jobs
 - `--mode write` and `rescue` need `--confirm-write`. The agent runs in a worktree on `polyglot/<job-id>`; the user's working tree is never written by the bridge (a job is flagged `sourceTreeModified` if the agent wrote there anyway).
-- The result carries `branch`, `baseRef` and `filesChanged` (the exact diff `base..branch`), and prints Inspect (`git diff <base> <branch>`), Apply (`git diff <base> <branch> | git apply`) and Discard (`git branch -D <branch>`).
+- The result carries `branch`, `baseRef` and `filesChanged` (the exact diff `base..branch`), and prints the inspect command (`git diff <base> <branch>`). `apply <job-id>` runs `git diff --binary base branch | git apply` from the repository root (all or nothing), `discard <job-id>` removes the branch and any kept worktree.
 - `adversarial-review`: `--focus <string>` (default "security, edge cases, vulnerability analysis, race conditions, failure modes"), review mode, review schema, Red Team prompt.
 - `rescue`: `--error`, `--test`, `--prompt`; builds a rescue prompt and runs in write mode.
 

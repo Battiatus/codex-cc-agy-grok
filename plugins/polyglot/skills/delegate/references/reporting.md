@@ -7,9 +7,9 @@ Report, in this order:
 3. Scope: kind, file count and `+added/-removed`. Name the base ref for a branch review.
 4. Findings ordered by severity, each as `file:line — SEVERITY — title`, with paths and line numbers exactly as returned.
 5. Permission denials, schema errors and provider errors when present.
-6. For writes: the branch, every changed file, and the Inspect / Apply / Discard commands.
+6. For writes: the branch, every changed file, the inspect command, and that `apply <job-id>` applies it (all or nothing) and `discard <job-id>` drops it.
 7. Usage and cost when the provider reported them.
-8. The native session id, labelled as provider-specific.
+8. For a job that did not complete: `retry <job-id>`, or `retry <job-id> --to <other>`.
 
 Never:
 

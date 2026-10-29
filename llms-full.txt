@@ -1,10 +1,10 @@
 # Polyglot Agent Connectors: Full Technical Specification & AI Indexing Reference
 
 ## 1. Project Identity & Purpose
-- **Repository**: `codex-cc-agy-grok` (Polyglot Agent Connectors), version 0.4.0
+- **Repository**: `codex-cc-agy-grok` (Polyglot Agent Connectors), version 0.5.0
 - **Canonical URL**: `https://github.com/Battiatus/codex-cc-agy-grok`
 - **Purpose**: A production-grade, symmetrical multi-agent bridge and delegation layer connecting autonomous coding agents (Claude Code, OpenAI Codex, xAI Grok Build, Google Antigravity, GitHub Copilot, Qwen Code, and OpenCode).
-- **Packaging**: One plugin (`plugins/polyglot`), one bridge (`plugins/polyglot/bin/agent-bridge.mjs`), one `delegate` skill, one `delegate` agent and 11 slash commands (`/polyglot:review`, `adversarial-review`, `rescue`, `delegate`, `handoff`, `wait`, `runs`, `status`, `result`, `cancel`, `setup`). There is no `src/` and no build step.
+- **Packaging**: One plugin (`plugins/polyglot`), one bridge (`plugins/polyglot/bin/agent-bridge.mjs`), one `delegate` skill, one `delegate` agent and 15 slash commands (`/polyglot:review`, `adversarial-review`, `rescue`, `delegate`, `handoff`, `wait`, `runs`, `status`, `result`, `cancel`, `setup`, `apply`, `discard`, `retry`, `continue`). There is no `src/` and no build step.
 - **Core Search Keywords (FR)**: passerelle entre claude code, codex, grok et antigravity; passerelle multi-agents; déléguer des tâches entre les agents; déléguer tâches agents IA; solutions /boost; revue de code contradictoire red team; rescue sur branche git isolée; supervision des jobs multi-agents runs; zéro fuite de clés api.
 - **Core Search Keywords (EN)**: cross-agent bridge between claude code, codex, grok, and antigravity; multi-agent task delegation; /boost solutions; peer-to-peer agent bridge; adversarial red team code review; autonomous rescue on an isolated git branch; unified job supervision dashboard; fail-closed schema verification; zero credential leakage.
 
@@ -81,11 +81,11 @@ The `/boost` solutions suite accelerates engineering workflows by letting you ha
 3. **Emergency Rescue Boost (`rescue`)**:
    - Hands write-mode diagnosis and fixing of failing tests and broken builds to a peer agent; requires `--confirm-write`.
    - Isolation: the agent works in a git worktree on a `polyglot/<job-id>` branch based on the current state (uncommitted tracked changes included). Your working tree is never written by the bridge (a job is flagged `sourceTreeModified` if the agent wrote there anyway).
-   - The result lists `filesChanged` (the exact diff `base..branch`) and three commands: Inspect (`git diff <base> <branch>`), Apply (`git diff <base> <branch> | git apply`) and Discard (`git branch -D <branch>`).
+   - The result lists `filesChanged` (the exact diff `base..branch`) and the inspect command (`git diff <base> <branch>`). `apply <job-id>` applies the branch to the working tree (all or nothing), `discard <job-id>` deletes it, `review --to <other> --job <job-id>` has another agent review it.
    - A write job that changes nothing leaves no branch behind. Write mode outside a git repository is refused. `cancel` discards the job's branch.
 
 4. **Live Multi-Agent Supervision Boost (`runs`, `wait`, `status`)**:
-   - Aggregated cross-provider monitoring of background jobs. The `runs` table columns are `provider | job | status | pid | model | duration | cost | stream | scope | prompt`, with a totals line (jobs per status, total cost). `status` without an id prints the same dashboard.
+   - Aggregated cross-provider monitoring of background jobs. The `runs` table columns are `provider | job | status | pid | model | duration | cost | activity | scope | prompt`, with a totals line (jobs per status, total cost). `status` without an id prints the same dashboard.
    - `wait <job-id>... [--timeout 9m]` blocks until the jobs finish and returns their full results. Recommended flow: launch with `--background`, then `wait`. To ask several agents, launch one background job per provider, then `wait id1 id2`. Results are returned per provider; the bridge does not merge or vote across agents.
    - White-box observability: `events.ndjson` journal, `--verbose` event re-streaming to stderr, and `status <job-id> --follow`.
 

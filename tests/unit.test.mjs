@@ -1,25 +1,32 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
+import test, { after } from "node:test";
 
 import { parseArgs, parseDuration } from "../plugins/polyglot/bin/lib/args.mjs";
-import { createCapture, lastJsonObject, parseProviderOutput, stripAnsi } from "../plugins/polyglot/bin/lib/parse.mjs";
+import { createCapture, createProgressTracker, lastJsonObject, parseProviderOutput, stripAnsi } from "../plugins/polyglot/bin/lib/parse.mjs";
 import { interpretVerdict, loadSchema, validate } from "../plugins/polyglot/bin/lib/schema.mjs";
 import { buildInvocationArgs, composePrompt } from "../plugins/polyglot/bin/lib/invocation.mjs";
 import { diffText, resolveScope } from "../plugins/polyglot/bin/lib/git.mjs";
 import { isSecretName, prepareExecutionRoot } from "../plugins/polyglot/bin/lib/isolation.mjs";
 import { resolveExecutable } from "../plugins/polyglot/bin/lib/exec.mjs";
-import { renderResult, renderRunsDashboard } from "../plugins/polyglot/bin/lib/render.mjs";
+import { renderResult, renderRunsDashboard, renderStats } from "../plugins/polyglot/bin/lib/render.mjs";
 import { buildHandoffDigest } from "../plugins/polyglot/bin/lib/transfer.mjs";
-import { jobPaths, listJobs, readJobTails, updateJob } from "../plugins/polyglot/bin/lib/jobs.mjs";
+import { jobPaths, listJobs, providerStats, readJobTails, updateJob } from "../plugins/polyglot/bin/lib/jobs.mjs";
 import { auditFlags, inspectConnector } from "../plugins/polyglot/bin/lib/setup.mjs";
 
+const scratchDirectories = [];
+
 async function scratch(name) {
-  return mkdtemp(join(tmpdir(), `polyglot-${name}-`));
+  const directory = await mkdtemp(join(tmpdir(), `polyglot-${name}-`));
+  scratchDirectories.push(directory);
+  return directory;
 }
+
+after(() => Promise.all(scratchDirectories.map((directory) =>
+  rm(directory, { recursive: true, force: true, maxRetries: 3 }).catch(() => {}))));
 
 function git(cwd, args) {
   return spawnSync("git", args, { cwd, encoding: "utf8", windowsHide: true });
@@ -638,7 +645,7 @@ test("renderRunsDashboard formats a valid Markdown table and sanitizes prompt pr
   ];
 
   const markdown = renderRunsDashboard(jobs);
-  assert.ok(markdown.includes("| provider | job | status | pid | model | duration | cost | stream | scope | prompt |"));
+  assert.ok(markdown.includes("| provider | job | status | pid | model | duration | cost | activity | scope | prompt |"));
   assert.ok(markdown.includes("| --- | --- | --- | --- | --- | --- | --- | --- |"));
   assert.ok(markdown.includes("| codex | `codex-12345` | RUNNING | 1234 | gpt-5.4-mini |"));
   assert.ok(markdown.includes("| claude | `claude-67890` | COMPLETED | — | claude-sonnet-5 |"));
@@ -940,4 +947,153 @@ test("the runs dashboard totals statuses and cost", () => {
   ]);
   assert.match(markdown, /\*\*3 jobs\*\* — COMPLETED 2 · FAILED 1 · \$0\.7500/);
   assert.match(markdown, /\| \$0\.5000 \|/);
+});
+
+test("live progress follows each provider's streamed tool calls, tokens and cost", () => {
+  const root = "C:\\work\\repo";
+  const feed = (tracker, events) => tracker.push(Buffer.from(events.map((event) => `${JSON.stringify(event)}\n`).join("")));
+
+  const codex = createProgressTracker({ root });
+  feed(codex, [
+    { type: "item.started", item: { type: "command_execution", command: "npm test" } },
+    { type: "item.completed", item: { type: "file_change", changes: [{ path: `${root}\\src\\a.js` }] } },
+    { type: "turn.completed", usage: { output_tokens: 40 } },
+  ]);
+  assert.deepEqual(codex.snapshot().recent, ["$ npm test", "edit src\\a.js"]);
+  assert.equal(codex.snapshot().outputTokens, 40);
+
+  // Claude's per-message usage is a placeholder: only the result counts.
+  const claude = createProgressTracker({ root: "C:/work/repo" });
+  feed(claude, [
+    { type: "assistant", message: { id: "m1", content: [{ type: "tool_use", name: "Read", input: { file_path: "C:/work/repo/math.js" } }], usage: { output_tokens: 2 } } },
+    { type: "assistant", message: { id: "m1", content: [{ type: "text", text: "ok" }], usage: { output_tokens: 2 } } },
+    { type: "assistant", message: { id: "m2", content: [
+      { type: "tool_use", name: "Grep", input: { pattern: "add", path: "C:/work/repo" } },
+      { type: "tool_use", name: "Bash", input: { command: "git status" } },
+    ] } },
+  ]);
+  assert.equal(claude.snapshot().outputTokens, null);
+  feed(claude, [{ type: "result", total_cost_usd: 0.25, usage: { output_tokens: 2172 } }]);
+  assert.equal(claude.snapshot().lastAction, "Bash git status");
+  assert.equal(claude.snapshot().actions, 3, "each tool call is one action");
+  assert.deepEqual(claude.snapshot().recent, ["Read math.js", "Grep add", "Bash git status"]);
+  assert.equal(claude.snapshot().outputTokens, 2172);
+  assert.equal(claude.snapshot().costUsd, 0.25);
+
+  const qwen = createProgressTracker({ root });
+  feed(qwen, [
+    { type: "assistant", message: { content: [{ type: "tool_use", name: "grep_search", input: { path: root } }] } },
+    { type: "assistant", message: { content: [{ type: "tool_use", name: "read_file", input: { path: `${root}-old\\x.js` } }] } },
+  ]);
+  assert.deepEqual(qwen.snapshot().recent, ["grep_search .", `read_file ${root}-old\\x.js`], "the root reads as ., a sibling stays whole");
+
+  const opencode = createProgressTracker();
+  feed(opencode, [
+    { type: "tool_use", part: { tool: "grep", state: { input: { pattern: "TODO" } } } },
+    { type: "step_finish", part: { cost: 0.01, tokens: { output: 7 } } },
+    { type: "step_finish", part: { cost: 0.02, tokens: { output: 3 } } },
+  ]);
+  assert.equal(opencode.snapshot().lastAction, "grep TODO");
+  assert.equal(opencode.snapshot().outputTokens, 10);
+  assert.ok(Math.abs(opencode.snapshot().costUsd - 0.03) < 1e-9);
+
+  const agy = createProgressTracker({ root });
+  feed(agy, [
+    { event: "step_update", step_update: { step_type: "tool", state: "ACTIVE", tool_name: "read_file", tool_info: { parameters: { Path: `${root}\\math.js` } } } },
+    { event: "step_update", step_update: { step_type: "agent_response", state: "DONE", usage: { output_tokens: 99 } } },
+  ]);
+  assert.equal(agy.snapshot().lastAction, "read_file math.js");
+  assert.equal(agy.snapshot().outputTokens, 99);
+});
+
+test("live progress survives events split across chunks and keeps only the last actions", () => {
+  const tracker = createProgressTracker();
+  assert.equal(tracker.snapshot(), null, "nothing to report before the first event");
+  const line = `${JSON.stringify({ type: "tool_use", part: { tool: "read", state: { input: { filePath: "été.js" } } } })}\n`;
+  const bytes = Buffer.from(line);
+  const cut = bytes.indexOf(Buffer.from("é")) + 1;
+  assert.equal(tracker.push(bytes.subarray(0, cut)), false, "half an event is not progress");
+  assert.equal(tracker.push(bytes.subarray(cut)), true);
+  assert.equal(tracker.snapshot().lastAction, "read été.js");
+  for (let index = 0; index < 8; index += 1) {
+    tracker.push(Buffer.from(`${JSON.stringify({ type: "tool_use", part: { tool: `t${index}` } })}\nnot json\n`));
+  }
+  assert.equal(tracker.snapshot().actions, 9);
+  assert.deepEqual(tracker.snapshot().recent, ["t3", "t4", "t5", "t6", "t7"]);
+});
+
+test("stream-json output is parsed from its result event, not from fenced JSON in assistant text", () => {
+  const stdout = [
+    { type: "system", subtype: "init", session_id: "s-1" },
+    { type: "assistant", message: { content: [{ type: "text", text: "```json\n{\"verdict\":\"approve\"}\n```" }] } },
+    { type: "result", subtype: "success", session_id: "s-1", result: "{\"verdict\":\"needs-attention\"}", total_cost_usd: 0.1 },
+  ].map((event) => JSON.stringify(event)).join("\n");
+  for (const adapter of ["claude", "qwen"]) {
+    const parsed = parseProviderOutput(adapter, { stdout });
+    assert.equal(parsed.structured.verdict, "needs-attention", adapter);
+    assert.equal(parsed.nativeSessionId, "s-1");
+  }
+  const unfinished = parseProviderOutput("claude", { stdout: stdout.split("\n").slice(0, 2).join("\n") });
+  assert.equal(unfinished.providerError, "provider output was not parseable", "a stream with no result event did not finish");
+});
+
+test("job listing skips stray entries and, with since, jobs created before it", async () => {
+  const home = await scratch("list-since");
+  const old = `codex-${(Date.now() - 72 * 3_600_000).toString(36)}-aaaa`;
+  const recent = `codex-${Date.now().toString(36)}-bbbb`;
+  for (const jobId of [old, recent]) {
+    await mkdir(jobPaths(jobId, home).directory, { recursive: true });
+    await writeFile(jobPaths(jobId, home).job, JSON.stringify({ jobId, status: "COMPLETED", createdAt: new Date().toISOString() }), "utf8");
+  }
+  await writeFile(join(home, "jobs", ".DS_Store"), "", "utf8");
+  assert.deepEqual((await listJobs({ all: true, stateHome: home })).map((job) => job.jobId).sort(), [old, recent].sort());
+  const since = Date.now() - 48 * 3_600_000;
+  assert.deepEqual((await listJobs({ all: true, since, stateHome: home })).map((job) => job.jobId), [recent]);
+});
+
+test("provider stats rank by recent completions and name the usual failure", () => {
+  const at = (minutes) => new Date(Date.UTC(2026, 0, 1, 0, minutes)).toISOString();
+  const jobs = [
+    { connector: "codex", status: "FAILED", completed: false, createdAt: at(1) },
+    { connector: "codex", status: "FAILED", completed: false, createdAt: at(2) },
+    { connector: "codex", status: "COMPLETED", completed: true, durationMs: 4_000, createdAt: at(3), costUsd: 0.5 },
+    { connector: "codex", status: "TIMEOUT", completed: false, createdAt: at(4) },
+    { connector: "codex", status: "RUNNING", completed: false, createdAt: at(5) },
+    { connector: "codex", status: "CANCELED", completed: false, createdAt: at(6) },
+    { connector: "codex", status: "EMPTY_SCOPE", completed: false, createdAt: at(7) },
+    { connector: "grok", status: "COMPLETED", completed: true, durationMs: 1_000, createdAt: at(1) },
+    { connector: "grok", status: "COMPLETED", completed: true, durationMs: 3_000, createdAt: at(2) },
+  ];
+  const [codex, grok] = providerStats(jobs);
+  assert.deepEqual(
+    { jobs: codex.jobs, completed: codex.completed, topFailure: codex.topFailure, costUsd: codex.costUsd },
+    { jobs: 4, completed: 1, topFailure: { status: "FAILED", count: 2 }, costUsd: 0.5 },
+    "running, canceled and empty-scope jobs are not a track record",
+  );
+  assert.equal(grok.successRate, 1);
+  assert.equal(grok.medianDurationMs, 2_000);
+  const [recentCodex] = providerStats(jobs, { recent: 2 });
+  assert.equal(recentCodex.jobs, 2, "only the newest jobs count when routing");
+  assert.equal(recentCodex.topFailure.status, "TIMEOUT");
+  assert.match(renderStats(providerStats(jobs)), /\| codex \| 4 \| 1 \| 25% \| 4\.0s \| \$0\.5000 \| FAILED ×2 \|/);
+});
+
+test("a running job shows what the agent is doing now", () => {
+  const markdown = renderResult({
+    connector: "agy",
+    jobId: "agy-1",
+    status: "RUNNING",
+    mode: "review",
+    progress: {
+      lastAction: "read_file math.js",
+      lastActionAt: new Date().toISOString(),
+      actions: 3,
+      recent: ["grep add", "list_dir .", "read_file math.js"],
+      outputTokens: 120,
+      costUsd: null,
+    },
+  });
+  assert.match(markdown, /\*\*Now:\*\* `read_file math\.js` \(3 actions, \d+s ago\)/);
+  assert.match(markdown, /- `grep add`\n- `list_dir \.`/);
+  assert.match(markdown, /So far: 120 output tokens/);
 });

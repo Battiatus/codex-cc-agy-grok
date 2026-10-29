@@ -1,6 +1,6 @@
 {
   "name": "polyglot-agent-connectors",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
   "description": "Passerelle multi-agents & solutions /boost (Cross-Agent Bridge) connectant Claude Code, OpenAI Codex, xAI Grok Build, Google Antigravity, GitHub Copilot, Qwen Code et OpenCode. Déléguez des tâches entre agents, exécutez des revues Red Team contradictoires, réparez sur une branche Git isolée et supervisez en temps réel.",

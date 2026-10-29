@@ -215,9 +215,15 @@ function normalizeUsage(usage) {
 }
 
 function parseClaude(stdout, adapter = "claude") {
-  let envelope = lastJsonObject(stdout);
-  // qwen prints the whole event list as one JSON array; the result is the last
-  // "result" event and has the same shape as Claude's envelope.
+  // stream-json: one event per line, the last "result" event is the envelope.
+  // Scanning lines first matters: assistant text events can carry fenced JSON
+  // that the generic extractor would mistake for the answer. A stream with no
+  // result event never finished, so it has no envelope at all.
+  const events = jsonLines(stdout);
+  const streamed = events.some((event) => ["system", "assistant", "user"].includes(event?.type));
+  let envelope = events.findLast((event) => event?.type === "result")
+    ?? (streamed ? null : lastJsonObject(stdout));
+  // `--output-format json` on qwen prints the whole event list as one array.
   if (Array.isArray(envelope)) envelope = envelope.findLast((event) => event?.type === "result") ?? null;
   if (!envelope) return null;
   const denials = Array.isArray(envelope.permission_denials) ? envelope.permission_denials : [];
@@ -417,6 +423,137 @@ function parseCodexStream(stdout, finalMessage) {
     denials,
     providerError,
     notices,
+  };
+}
+
+const RECENT_ACTIONS = 5;
+const MAX_ACTION_CHARS = 120;
+
+function clip(text) {
+  const flat = String(text).replace(/\s+/g, " ").trim();
+  return flat.length > MAX_ACTION_CHARS ? `${flat.slice(0, MAX_ACTION_CHARS - 3)}...` : flat;
+}
+
+function toolAction(name, input) {
+  const args = input && typeof input === "object" ? input : {};
+  // A search says more by its pattern than by the directory it searched.
+  const target = firstString(
+    args.command, args.cmd, args.pattern, args.query, args.file_path, args.filePath,
+    args.path, args.Path, args.url,
+  );
+  return target ? `${name || "tool"} ${target}` : String(name || "tool");
+}
+
+// One streamed provider event as {actions, outputTokens, outputDelta, costUsd,
+// costDelta}, each optional. Shapes were captured from live runs: codex
+// `exec --json`, claude/qwen stream-json, opencode `--format json`, agy
+// stream-json. Claude's per-message usage is a placeholder until the final
+// result event, so assistant events give actions only.
+function readProgressEvent(event) {
+  if (!event || typeof event !== "object") return null;
+  const item = event.item;
+  if (event.type === "item.started" && item?.type === "command_execution") return { actions: [`$ ${item.command}`] };
+  if (event.type === "item.started" && item?.type === "mcp_tool_call") return { actions: [`${item.server}.${item.tool}`] };
+  if (event.type === "item.started" && item?.type === "web_search") return { actions: [`search ${item.query}`] };
+  if (event.type === "item.completed" && item?.type === "file_change") {
+    return { actions: [`edit ${(item.changes || []).map((change) => change.path).join(", ")}`] };
+  }
+  if (event.type === "turn.completed") return { outputTokens: event.usage?.output_tokens };
+  if (event.type === "assistant" && Array.isArray(event.message?.content)) {
+    return {
+      actions: event.message.content
+        .filter((part) => part?.type === "tool_use")
+        .map((part) => toolAction(part.name, part.input)),
+    };
+  }
+  if (event.type === "result") return { costUsd: event.total_cost_usd, outputTokens: event.usage?.output_tokens };
+  if (event.type === "tool_use") return { actions: [toolAction(event.part?.tool, event.part?.state?.input)] };
+  if (event.type === "step_finish") return { costDelta: event.part?.cost, outputDelta: event.part?.tokens?.output };
+  const step = event.step_update;
+  if (event.event === "step_update" && step) {
+    if (step.step_type === "tool" && step.state === "ACTIVE") return { actions: [toolAction(step.tool_name, step.tool_info?.parameters)] };
+    if (step.state === "DONE") return { outputDelta: step.usage?.output_tokens };
+  }
+  return null;
+}
+
+// Follows a provider's stdout as it streams and keeps what a human watching
+// would want: the current action, the last few, and output tokens and cost so
+// far. Paths under `root` are shown relative to it.
+export function createProgressTracker({ root = null } = {}) {
+  const decoder = new StringDecoder("utf8");
+  const roots = root ? [...new Set([root, root.replace(/\\/g, "/")])] : [];
+  const state = { lastAction: null, lastActionAt: null, actions: 0, recent: [], outputTokens: null, costUsd: null };
+  let buffer = "";
+
+  // The workspace root itself reads as ".", anything under it as a relative
+  // path; a sibling such as <root>-old is left alone.
+  const patterns = roots.map((prefix) => {
+    const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return [new RegExp(`${escaped}[\\\\/]`, "g"), new RegExp(`${escaped}(?=$|[\\s"',;:)\\]])`, "g")];
+  });
+  const relativize = (text) => patterns.reduce(
+    (current, [under, exact]) => current.replace(under, "").replace(exact, "."),
+    text,
+  );
+  const num = (value) => (typeof value === "number" && Number.isFinite(value) ? value : null);
+
+  function apply(event) {
+    const progress = readProgressEvent(event);
+    if (!progress) return false;
+    let changed = false;
+    for (const raw of progress.actions ?? []) {
+      const action = clip(relativize(raw));
+      state.lastAction = action;
+      state.lastActionAt = new Date().toISOString();
+      state.actions += 1;
+      state.recent = [...state.recent, action].slice(-RECENT_ACTIONS);
+      changed = true;
+    }
+    if (num(progress.outputTokens) !== null) {
+      state.outputTokens = progress.outputTokens;
+      changed = true;
+    }
+    if (num(progress.outputDelta) !== null) {
+      state.outputTokens = (state.outputTokens ?? 0) + progress.outputDelta;
+      changed = true;
+    }
+    if (num(progress.costDelta) !== null) {
+      state.costUsd = (state.costUsd ?? 0) + progress.costDelta;
+      changed = true;
+    }
+    if (num(progress.costUsd) !== null) {
+      state.costUsd = progress.costUsd;
+      changed = true;
+    }
+    return changed;
+  }
+
+  return {
+    // Returns true when the snapshot changed.
+    push(chunk) {
+      buffer += decoder.write(chunk);
+      let changed = false;
+      let index = buffer.indexOf("\n");
+      while (index !== -1) {
+        const line = buffer.slice(0, index).trim();
+        buffer = buffer.slice(index + 1);
+        if (line.startsWith("{")) {
+          try {
+            changed = apply(JSON.parse(line)) || changed;
+          } catch {
+            // A non-JSON line carries no progress.
+          }
+        }
+        index = buffer.indexOf("\n");
+      }
+      return changed;
+    },
+    snapshot() {
+      return state.actions || state.outputTokens !== null || state.costUsd !== null
+        ? { ...state, recent: [...state.recent] }
+        : null;
+    },
   };
 }
 

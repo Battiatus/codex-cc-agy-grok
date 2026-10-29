@@ -19,6 +19,10 @@ const REQUIRED_COMMANDS = [
   "result.md",
   "cancel.md",
   "setup.md",
+  "apply.md",
+  "discard.md",
+  "retry.md",
+  "continue.md",
 ];
 
 const REQUIRED_INVOCATION_GROUPS = [
@@ -137,7 +141,7 @@ for (const file of providerFiles) {
 // root hooks.json, in its own shape ({name: {Event: [spec]}}), runs it from the
 // plugin folder without ${CLAUDE_PLUGIN_ROOT}, and has no SessionEnd event.
 const hooks = await json(join(pluginRoot, "hooks", "hooks.json"));
-for (const event of ["SessionStart", "SessionEnd"]) {
+for (const event of ["SessionStart", "UserPromptSubmit", "SessionEnd"]) {
   if (!hooks.hooks?.[event]?.length) fail(`hooks/hooks.json: ${event} hook is missing`);
 }
 if (hooks.$schema) fail("hooks.json must not declare $schema — Codex rejects it");

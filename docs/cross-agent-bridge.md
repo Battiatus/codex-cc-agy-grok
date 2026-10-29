@@ -58,7 +58,7 @@ A review runs in place by default, so git history stays available and nothing is
 Write access is blocked unless both `--mode write` and `--confirm-write` are explicitly passed. `rescue` writes too, and needs `--confirm-write` as well: it does not confirm on its own. For a write job:
 1. The bridge takes the current state of the repository (uncommitted tracked changes included) as the base and creates a git worktree on a `polyglot/<job-id>` branch.
 2. The target agent works in that worktree. The user's working tree is never written by the bridge (a job is flagged `sourceTreeModified` if the agent wrote there anyway).
-3. `filesChanged` is the exact diff `base..branch`. The result prints **Inspect** (`git diff <base> <branch>`), **Apply** (`git diff <base> <branch> | git apply`) and **Discard** (`git branch -D <branch>`).
+3. `filesChanged` is the exact diff `base..branch`. The result prints the inspect command (`git diff <base> <branch>`); `apply <job-id>` applies the branch to the working tree (all or nothing), `discard <job-id>` deletes it, and `review --to <other> --job <job-id>` has another agent review it in a worktree of that branch.
 4. Write mode outside a git repository is refused. `cancel` discards the job's branch, and a job that changes nothing leaves no branch behind.
 
 ### Prompt Delivery
@@ -99,6 +99,6 @@ The bridge ships as a single plugin, `plugins/polyglot`. There is no `src/` and 
 - `.claude-plugin/plugin.json` for Claude Code
 - `plugin.json` & `hooks.json` for Google Antigravity
 - `bin/providers/<id>.json` provider contracts (7)
-- `commands/*.md` (11 slash commands: `/polyglot:review`, `adversarial-review`, `rescue`, `delegate`, `handoff`, `wait`, `runs`, `status`, `result`, `cancel`, `setup`)
+- `commands/*.md` (15 slash commands: `/polyglot:review`, `adversarial-review`, `rescue`, `delegate`, `handoff`, `wait`, `runs`, `status`, `result`, `cancel`, `setup`, `apply`, `discard`, `retry`, `continue`)
 - `skills/delegate/SKILL.md`
 - `agents/delegate.md`

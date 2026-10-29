@@ -31,4 +31,4 @@ Unverified: the success output shapes of the Grok and Copilot CLIs (not logged i
 - [SEO & Multi-Agent FAQ](docs/faq-seo.md): Bilingual FAQ answering high-intent developer queries on Google, Bing, Perplexity, and Copilot.
 - [SEO & Discoverability Guide](docs/seo-guide.md): Operational guide for repository ranking, GitHub Topics, Open Graph social cards, and indexing strategies.
 - [Repository Readme](README.md): Visual hero presentation, terminal preview, comparison matrix, and quickstart commands.
-- [Project Architecture & v0.4.0 Changelog](PROJECT.md): Component inventory, interface contracts, and v0.4.0 changes.
+- [Project Architecture & v0.5.0 Changelog](PROJECT.md): Component inventory, interface contracts, and v0.5.0 changes.

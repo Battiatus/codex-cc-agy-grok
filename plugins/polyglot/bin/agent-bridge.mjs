@@ -5,7 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { COMMANDS, parseArgs, parseDuration, parsePositiveNumber, requireEnum } from "./lib/args.mjs";
-import { REVIEW_SCOPES, head, repositoryRoot } from "./lib/git.mjs";
+import { REVIEW_SCOPES, applyBranch, branchExists, head, repositoryRoot } from "./lib/git.mjs";
 import { collectGarbage, discardWriteTarget } from "./lib/isolation.mjs";
 import {
   TERMINAL_STATUSES,
@@ -14,6 +14,7 @@ import {
   listJobs,
   newJobId,
   nowIso,
+  providerStats,
   readEvents,
   readJobTails,
   reapStaleJobs,
@@ -25,12 +26,12 @@ import {
   updateJob,
   writeJsonAtomic,
 } from "./lib/jobs.mjs";
-import { executeJob, terminateTree } from "./lib/provider.mjs";
-import { renderResult, renderRunsDashboard, renderSetup } from "./lib/render.mjs";
+import { chainFromEnv, executeJob, terminateTree } from "./lib/provider.mjs";
+import { renderResult, renderRunsDashboard, renderSetup, renderStats } from "./lib/render.mjs";
 import { auditFlags, inspectConnector } from "./lib/setup.mjs";
 import { TRANSFER_HOSTS, buildHandoffDigest, composeHandoffPrompt } from "./lib/transfer.mjs";
 
-const BRIDGE_VERSION = "0.4.0";
+const BRIDGE_VERSION = "0.5.0";
 const MODES = ["review", "write"];
 const FORMATS = ["json", "markdown"];
 const DEFAULT_REVIEW_PROMPT = "Review the change in scope and report every defect you can justify.";
@@ -161,6 +162,10 @@ async function createJobRecord(config, request) {
     effort: request.effort,
     contextOrigin: request.contextOrigin ?? null,
     nativeSessionId: request.session,
+    launch: request.launch ?? null,
+    autoRouted: request.autoRouted ?? false,
+    retryOf: request.retryOf ?? null,
+    reviewOf: request.reviewOf ?? null,
     createdAt: request.createdAt,
     updatedAt: request.createdAt,
   });
@@ -327,6 +332,7 @@ function helpText() {
   return {
     bridgeVersion: BRIDGE_VERSION,
     providers: providerIds(),
+    routing: "--to auto picks the installed, signed-in provider with the best recent completion rate that supports the options given; never a provider already in the delegation chain, Claude Code when it is the host, or (with --job) the job's author.",
     usage: [
       "setup [--to <provider>] [--format json|markdown]",
       "doctor [--to <provider>]",
@@ -336,9 +342,14 @@ function helpText() {
       `rescue ${to} --confirm-write [--prompt "<task>"] [--error "<trace>"] [--test "<command>"] [run options]`,
       `run ${to} --prompt "<task>" [--mode review|write --confirm-write] [--schema review|<path>] [--expect-response <text>] [--stream] [--verbose] [review options]`,
       `resume ${to} --session <native-id> --prompt "<follow-up>" [run options]`,
+      "continue <job-id> --prompt \"<follow-up>\" [run options]  (resumes that job's provider session)",
+      `review ${to} --job <write-job-id>  (another agent reviews that job's branch)`,
+      "retry <job-id> [--to <provider>] [run options]  (same request; a write needs --confirm-write again)",
+      "apply <job-id>  (applies a write job's branch to the working tree; all or nothing)",
+      "discard <job-id>  (deletes a write job's branch and kept worktree)",
       `handoff ${to} --from-host claude|codex|grok|agy [--source <path>] --prompt "<task>" [run options]`,
       "wait <job-id>... [--timeout 9m] [--format json|markdown]",
-      "runs [--all] [--reap] [--cwd <path>] [--format json|markdown]",
+      "runs [--all] [--reap] [--stats] [--cwd <path>] [--format json|markdown]",
       "status [job-id] [--all] [--reap] [--tail <lines>] [--follow] [--format json|markdown]",
       "result <job-id> [--format json|markdown]",
       "cancel <job-id>",
@@ -352,13 +363,177 @@ function helpText() {
   };
 }
 
-async function runJobCommand(command, options, format) {
-  const config = await loadProvider(options.to);
+// What retry needs to replay a launch. Never the write confirmation: a retried
+// write must be confirmed again. Paths are made absolute, since a retry may run
+// from another directory.
+const NOT_REPLAYED = new Set(["background", "format", "confirm-write", "request", "help"]);
+
+function launchRecord(command, options) {
+  const kept = Object.fromEntries(Object.entries(options).filter(([key]) => !NOT_REPLAYED.has(key)));
+  const absolute = (value) => (value ? resolve(value) : value);
+  return {
+    command,
+    options: {
+      ...kept,
+      _: [...options._],
+      cwd: resolve(options.cwd || process.cwd()),
+      ...(options.schema && options.schema !== "review" ? { schema: absolute(options.schema) } : {}),
+      ...(options.source ? { source: absolute(options.source) } : {}),
+    },
+  };
+}
+
+const AUTO_ROUTING_WINDOW = 20;
+
+// --to auto: the provider most likely to finish, by recent completion rate (an
+// untried provider counts as even odds), among those that support the options
+// asked for, are installed and not logged out. Skips the delegation chain,
+// Claude Code when it is the host, and `exclude` (the author of a reviewed job).
+async function autoProvider(options, exclude = []) {
+  const skip = new Set([...chainFromEnv(), ...exclude]);
+  if (process.env.CLAUDECODE) skip.add("claude");
+  const fits = (config) => (!options.model || config.capabilities?.model)
+    && (!options.effort || (config.capabilities?.effort && config.effortValues?.includes(options.effort)))
+    && (!options["max-budget-usd"] || config.capabilities?.budgetUsd);
+  const stats = new Map(providerStats(await listJobs({ all: true }), { recent: AUTO_ROUTING_WINDOW })
+    .map((entry) => [entry.provider, entry]));
+  const score = (id) => {
+    const entry = stats.get(id);
+    return entry ? (entry.completed + 1) / (entry.jobs + 2) : 0.5;
+  };
+  const ranked = providerIds().filter((id) => !skip.has(id)).sort((left, right) => score(right) - score(left));
+  for (const id of ranked) {
+    const config = await loadProvider(id);
+    if (!fits(config)) continue;
+    const report = inspectConnector(config);
+    if (report.installed && report.authenticated !== false) return id;
+  }
+  throw new Error("--to auto found no installed, signed-in provider that supports these options. Run setup to see why.");
+}
+
+// The record and stored result of a finished job; actions on a live job are refused.
+async function finishedJob(jobId) {
+  if (!jobId) throw new Error("A job id is required.");
+  const paths = jobPaths(jobId);
+  const job = await readJsonOrNull(paths.job);
+  if (!job) throw new Error(`Job not found: ${jobId}`);
+  if (!TERMINAL_STATUSES.has(job.status)) {
+    throw new Error(`Job ${jobId} is still ${job.status}. Run "wait ${jobId}" first.`);
+  }
+  return { job, result: (await readJsonOrNull(paths.result)) || {} };
+}
+
+async function applyJob(jobId) {
+  const { job, result } = await finishedJob(jobId);
+  if (!result.branch || !result.baseRef || job.discardedAt) throw new Error(`Job ${jobId} has no branch to apply.`);
+  // A failed commit leaves the branch at its base and the work in the kept
+  // worktree: "applying" it would apply nothing and invite a discard.
+  if (result.phase === "commit" || !Array.isArray(result.filesChanged) || result.filesChanged.length === 0) {
+    throw new Error(`Job ${jobId} has no committed change to apply. ${result.error ?? ""}`.trim());
+  }
+  if (job.appliedAt) throw new Error(`Job ${jobId} was already applied at ${job.appliedAt}.`);
+  const failure = applyBranch(job.repositoryRoot || job.sourceCwd, result.baseRef, result.branch);
+  if (failure) {
+    const why = failure.clash ? "the change clashes with the working tree" : "the branch could not be read";
+    throw new Error(`Nothing was applied: ${why} (${failure.message.split("\n")[0]}). Inspect it with git diff ${result.baseRef.slice(0, 12)} ${result.branch}.`);
+  }
+  await updateJob(jobId, { appliedAt: nowIso() });
+  return {
+    jobId,
+    action: "applied",
+    branch: result.branch,
+    filesChanged: result.filesChanged,
+    message: `Applied ${result.branch} to the working tree (${result.filesChanged.join(", ")}). Nothing is staged or committed. Run "discard ${jobId}" to delete the branch.`,
+  };
+}
+
+async function discardJob(jobId) {
+  const { job, result } = await finishedJob(jobId);
+  if (job.mode !== "write") throw new Error(`Job ${jobId} is a ${job.mode} job and has no branch.`);
+  const branch = result.branch ?? `polyglot/${jobId}`;
+  const root = job.repositoryRoot || job.sourceCwd;
+  const deleted = discardWriteTarget(root, jobId);
+  // A branch already gone is discarded; one still there (checked out) is not.
+  if (!deleted.ok && branchExists(root, branch)) {
+    throw new Error(`Could not delete ${branch}: ${deleted.stderr || deleted.error}`);
+  }
+  await updateJob(jobId, { branch: null, discardedAt: nowIso() });
+  return { jobId, action: "discarded", branch, message: `Deleted ${branch} and any worktree it kept.` };
+}
+
+async function retryJob(cliOptions, format) {
+  const { _: [jobId], ...overrides } = cliOptions;
+  const { job } = await finishedJob(jobId);
+  if (!job.launch) throw new Error(`Job ${jobId} predates retry: it has no launch record.`);
+  const options = { ...job.launch.options, ...overrides };
+  if (overrides.to && overrides.to !== job.launch.options.to) {
+    // Model and effort names belong to the original provider.
+    if (!overrides.model) delete options.model;
+    if (!overrides.effort) delete options.effort;
+  }
+  await runJobCommand(job.launch.command, options, format, { retryOf: jobId });
+}
+
+// Resumes the provider's own session from a job id. Only for a job that ran in
+// place: several providers (claude, qwen) find a session by its directory, and
+// a write or isolated job's worktree is gone.
+async function continueJob(cliOptions, format) {
+  const [jobId, ...words] = cliOptions._;
+  const { job } = await finishedJob(jobId);
+  if (!job.nativeSessionId) throw new Error(`Job ${jobId} has no native session to continue.`);
+  if (job.executionCwd && resolve(job.executionCwd) !== resolve(job.sourceCwd)) {
+    throw new Error(`Job ${jobId} ran in a temporary worktree that no longer exists, so its session cannot be resumed reliably. Use "retry ${jobId}" or a new run.`);
+  }
+  await runJobCommand("resume", {
+    ...cliOptions,
+    _: words,
+    to: job.connector,
+    session: job.nativeSessionId,
+    cwd: job.sourceCwd,
+  }, format);
+}
+
+// A finished job the host has read is not announced again on its next prompt.
+// Called after printing, and never fatal: the result already reached the host.
+async function markSeen(reports) {
+  const seenAt = nowIso();
+  await Promise.all(reports
+    .filter((report) => report?.jobId && TERMINAL_STATUSES.has(report.status))
+    .map((report) => updateJob(report.jobId, { notifiedAt: seenAt }).catch(() => {})));
+}
+
+async function runJobCommand(command, options, format, origin = {}) {
+  const launch = launchRecord(command, options);
   if (command === "resume" && !options.session) {
     throw new Error("resume requires --session <native-id>.");
   }
+  const isReview = command === "review" || command === "adversarial-review";
 
   let promptOverride = null;
+  let reviewed = null;
+  if (options.job) {
+    if (!isReview) throw new Error("--job only applies to review and adversarial-review.");
+    reviewed = await finishedJob(options.job);
+    if (!reviewed.result.filesChanged?.length || reviewed.result.phase === "commit" || reviewed.job.discardedAt) {
+      throw new Error(`Job ${options.job} has no committed branch to review.`);
+    }
+    // Everything from the base the agent started on to its branch tip: what
+    // `apply` would bring in, even if the agent committed on its own.
+    options.scope = "commit";
+    options.commit = reviewed.result.branch;
+    options.base = reviewed.result.baseRef;
+    options.cwd = reviewed.job.repositoryRoot || reviewed.job.sourceCwd;
+    if (command === "review" && !options.prompt && options._.length === 0) {
+      promptOverride = `Review the change another agent (${reviewed.job.connector}) made for this task:\n${reviewed.job.prompt}\n\nReport every defect you can justify, including any part of the task it left undone.`;
+    }
+  }
+
+  const autoRouted = options.to === "auto";
+  if (autoRouted) {
+    if (command === "resume") throw new Error("--to auto cannot resume a session: a session belongs to one provider.");
+    options.to = await autoProvider(options, reviewed ? [reviewed.job.connector] : []);
+  }
+  const config = await loadProvider(options.to);
   let handoff = null;
   if (command === "handoff") {
     const fromHost = requireEnum("--from-host", options["from-host"], TRANSFER_HOSTS, undefined);
@@ -373,7 +548,7 @@ async function runJobCommand(command, options, format) {
     if (!task) throw new Error('handoff requires --prompt "<task>".');
     promptOverride = composeHandoffPrompt(handoff, task);
   }
-  if (command === "review" && !options.prompt && options._.length === 0) {
+  if (command === "review" && !promptOverride && !options.prompt && options._.length === 0) {
     promptOverride = DEFAULT_REVIEW_PROMPT;
   }
   if (command === "adversarial-review") {
@@ -393,7 +568,6 @@ async function runJobCommand(command, options, format) {
     promptOverride = `Rescue operation: ${userTask}${errorContext}${testContext}\nDiagnose the root cause, make minimal targeted fixes to resolve the errors/failing tests, and verify the fix. Report all touched files.`;
   }
 
-  const isReview = command === "review" || command === "adversarial-review";
   const structured = config.capabilities?.structuredOutput !== "none";
   const request = normalizeRequest(config, options, {
     defaultSchema: isReview && structured ? "review" : null,
@@ -405,6 +579,15 @@ async function runJobCommand(command, options, format) {
     request.handoffFromHost = handoff.fromHost;
     request.handoffSource = handoff.sourcePath;
   }
+  if (reviewed) {
+    // The reviewer reads the branch's files, not the user's working tree.
+    request.isolate = true;
+    request.worktreeRef = reviewed.result.branch;
+    request.reviewOf = options.job;
+  }
+  request.launch = launch;
+  request.autoRouted = autoRouted;
+  request.retryOf = origin.retryOf ?? null;
 
   if (options.background) {
     print(await startBackground(config, request), format, renderResult);
@@ -412,6 +595,7 @@ async function runJobCommand(command, options, format) {
   }
   const result = await runForeground(config, request);
   print(result, format, renderResult);
+  await markSeen([result]);
   if (!result?.completed) process.exitCode = EXIT_NOT_COMPLETED;
 }
 
@@ -483,8 +667,14 @@ export async function main(argv = process.argv.slice(2)) {
     const timeoutMs = options.timeout ? parseDuration(options.timeout) : DEFAULT_WAIT_MS;
     const report = await waitForJobs(options._, timeoutMs);
     print(report, format, renderWait);
+    await markSeen(report.jobs);
     if (!report.done) process.exitCode = EXIT_PENDING;
     else if (report.jobs.some((job) => !job.completed)) process.exitCode = EXIT_NOT_COMPLETED;
+    return;
+  }
+
+  if (command === "runs" && options.stats) {
+    print(providerStats(await listJobs({ all: true })), format, renderStats);
     return;
   }
 
@@ -506,12 +696,32 @@ export async function main(argv = process.argv.slice(2)) {
       return;
     }
     const tailLines = parsePositiveNumber("--tail", options.tail) ?? 15;
-    print(await inspectJob(jobId, { tailLines }), format, renderResult);
+    const report = await inspectJob(jobId, { tailLines });
+    print(report, format, renderResult);
+    await markSeen([report]);
     return;
   }
 
   if (command === "result") {
-    print(await getResult(options._[0]), format, renderResult);
+    const result = await getResult(options._[0]);
+    print(result, format, renderResult);
+    await markSeen([result]);
+    return;
+  }
+
+  if (command === "apply" || command === "discard") {
+    const report = await (command === "apply" ? applyJob : discardJob)(options._[0]);
+    print(report, format, (value) => value.message);
+    return;
+  }
+
+  if (command === "retry") {
+    await retryJob(options, format);
+    return;
+  }
+
+  if (command === "continue") {
+    await continueJob(options, format);
     return;
   }
 

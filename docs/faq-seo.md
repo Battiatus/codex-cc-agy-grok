@@ -11,7 +11,7 @@
 ```bash
 node scripts/install.mjs --host all --apply
 ```
-Chaque agent dispose alors de 11 commandes slash (`/polyglot:review`, `/polyglot:adversarial-review`, `/polyglot:rescue`, `/polyglot:delegate`, `/polyglot:handoff`, `/polyglot:wait`, `/polyglot:runs`, `/polyglot:status`, `/polyglot:result`, `/polyglot:cancel`, `/polyglot:setup`), d'un skill `delegate` et d'un agent `delegate` pour invoquer les autres agents. Chaque commande de job prend `--to codex|claude|grok|agy|copilot|qwen|opencode`.
+Chaque agent dispose alors de 15 commandes slash (`/polyglot:review`, `/polyglot:adversarial-review`, `/polyglot:rescue`, `/polyglot:delegate`, `/polyglot:handoff`, `/polyglot:wait`, `/polyglot:runs`, `/polyglot:status`, `/polyglot:result`, `/polyglot:cancel`, `/polyglot:setup`, `/polyglot:apply`, `/polyglot:discard`, `/polyglot:retry`, `/polyglot:continue`), d'un skill `delegate` et d'un agent `delegate` pour invoquer les autres agents. Chaque commande de job prend `--to codex|claude|grok|agy|copilot|qwen|opencode`, ou `--to auto`.
 
 ### 2. Comment déléguer des tâches entre les agents IA sans perdre le contexte Git ?
 Le pont (`agent-bridge.mjs`) résout automatiquement la portée Git (`auto`, `uncommitted`, `staged`, `branch`, `commit`, `workspace`) et injecte le diff exact directement dans le prompt de l'agent cible.
@@ -42,7 +42,7 @@ node plugins/polyglot/bin/agent-bridge.mjs rescue --to agy \
   --test "npm test" \
   --confirm-write --background
 ```
-Le pont crée un worktree Git sur la branche `polyglot/<job-id>`, à partir de l'état courant du dépôt (modifications suivies non commitées incluses), et l'agent y travaille. Le résultat liste les fichiers modifiés (`filesChanged`, le diff exact `base..branche`) et trois commandes : **Inspect** (`git diff <base> <branche>`), **Apply** (`git diff <base> <branche> | git apply`) et **Discard** (`git branch -D <branche>`). Hors dépôt Git, le mode écriture est refusé ; `cancel` supprime la branche d'un job d'écriture.
+Le pont crée un worktree Git sur la branche `polyglot/<job-id>`, à partir de l'état courant du dépôt (modifications suivies non commitées incluses), et l'agent y travaille. Le résultat liste les fichiers modifiés (`filesChanged`, le diff exact `base..branche`) la commande pour l'inspecter (`git diff <base> <branche>`). `review --to <autre> --job <id>` la fait relire par un autre agent, `apply <id>` l'applique à l'arbre de travail (tout ou rien, rien n'est indexé) et `discard <id>` la supprime. Hors dépôt Git, le mode écriture est refusé ; `cancel` supprime la branche d'un job d'écriture.
 
 ### 5. Comment superviser les agents IA en temps réel (`runs`, `status`, `wait`) ?
 Le pont centralise l'état de tous les jobs dans un tableau de bord unifié :
@@ -69,7 +69,7 @@ Codes de sortie : `0` COMPLETED, `2` terminé sans être complété, `3` toujour
 ## 🇬🇧 Frequently Asked Questions (English)
 
 ### 1. How do I bridge Claude Code, OpenAI Codex, Grok Build, and Google Antigravity?
-**Polyglot Agent Connectors (`codex-cc-agy-grok`)** is a turnkey cross-host bridge for local AI coding CLIs. One plugin, `polyglot`, provides native manifests, 11 slash commands, a `delegate` skill and a `delegate` agent across:
+**Polyglot Agent Connectors (`codex-cc-agy-grok`)** is a turnkey cross-host bridge for local AI coding CLIs. One plugin, `polyglot`, provides native manifests, 15 slash commands, a `delegate` skill and a `delegate` agent across:
 - **Claude Code** (`claude` CLI)
 - **OpenAI Codex** (`codex` CLI)
 - **xAI Grok Build** (`grok` CLI)
@@ -99,11 +99,12 @@ Launch with `--background`, then block on `wait <job-id>`.
 - **Unified Process Supervision**: Track all running agent jobs across providers from a single dashboard.
 
 ### 4. How does rescue and the isolated Git branch work?
-Whenever a write or rescue command is issued with `--confirm-write`, the bridge creates a git worktree on a `polyglot/<job-id>` branch, based on the current state of the repository, and the target agent works there. Your working tree is never written by the bridge (a job is flagged `sourceTreeModified` if the agent wrote there anyway). The result lists `filesChanged` (the exact diff `base..branch`) and the commands to inspect, apply or discard the branch:
+Whenever a write or rescue command is issued with `--confirm-write`, the bridge creates a git worktree on a `polyglot/<job-id>` branch, based on the current state of the repository, and the target agent works there. Your working tree is never written by the bridge (a job is flagged `sourceTreeModified` if the agent wrote there anyway). The result lists `filesChanged` (the exact diff `base..branch`) and what to do with the branch:
 ```bash
-git diff <base> <branch>              # Inspect
-git diff <base> <branch> | git apply  # Apply
-git branch -D <branch>                # Discard
+git diff <base> <branch>                                  # Inspect
+node agent-bridge.mjs review --to <other> --job <job-id>  # Second opinion on the branch
+node agent-bridge.mjs apply <job-id>                      # Apply to the working tree, all or nothing
+node agent-bridge.mjs discard <job-id>                    # Delete the branch
 ```
 Write mode outside a git repository is refused, and `cancel` discards the branch of a running write job.
 

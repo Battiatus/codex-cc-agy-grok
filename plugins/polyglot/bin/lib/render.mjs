@@ -33,6 +33,12 @@ function formatDuration(durationMs) {
   return durationMs < 1000 ? `${durationMs}ms` : `${(durationMs / 1000).toFixed(1)}s`;
 }
 
+function ago(iso) {
+  if (!iso) return null;
+  const seconds = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+  return `${seconds}s ago`;
+}
+
 export function renderResult(result) {
   if (!result) return "No result available.";
   const lines = [];
@@ -92,8 +98,23 @@ export function renderResult(result) {
     lines.push("", `Artifacts — ${artifacts.join(" · ")}`);
   }
 
-  if (!result.error && (result.status === "RUNNING" || result.status === "QUEUED")) {
-    lines.push("", `Live state: \`status ${result.jobId}\` shows stdout/stderr tails.`);
+  const running = result.status === "RUNNING" || result.status === "QUEUED";
+  const progress = result.progress;
+  if (running && progress?.lastAction) {
+    const facts = [`${progress.actions} action${progress.actions === 1 ? "" : "s"}`, ago(progress.lastActionAt)];
+    lines.push("", `**Now:** \`${progress.lastAction}\` (${facts.filter(Boolean).join(", ")})`);
+    const earlier = progress.recent.slice(0, -1);
+    if (earlier.length) lines.push("", "Before that:", ...earlier.map((action) => `- \`${action}\``));
+  }
+  if (running && progress && (progress.outputTokens !== null || progress.costUsd !== null)) {
+    const sofar = [
+      progress.outputTokens !== null ? `${progress.outputTokens} output tokens` : null,
+      progress.costUsd !== null ? `$${progress.costUsd.toFixed(4)}` : null,
+    ].filter(Boolean).join(" · ");
+    lines.push("", `So far: ${sofar}`);
+  }
+  if (!result.error && running) {
+    lines.push("", `Live state: \`status ${result.jobId}\` refreshes this; \`status ${result.jobId} --tail 40\` adds raw output.`);
   }
   if (result.providerError) lines.push("", `**Provider error:** ${result.providerError}`);
   if (result.scope?.empty) lines.push("", "Nothing was in scope. This is not an approval.");
@@ -144,12 +165,10 @@ export function renderResult(result) {
     lines.push("", `### Files changed on branch \`${result.branch}\` (working tree untouched)`);
     for (const file of result.filesChanged) lines.push(`- \`${file}\``);
     if (result.branch && result.baseRef) {
-      const range = `${result.baseRef.slice(0, 12)} ${result.branch}`;
       lines.push(
         "",
-        `Inspect: \`git diff ${range}\``,
-        `Apply: \`git diff --binary ${range} | git apply\``,
-        `Discard: \`git branch -D ${result.branch}\``,
+        `Inspect: \`git diff ${result.baseRef.slice(0, 12)} ${result.branch}\``,
+        `Apply to the working tree: bridge \`apply ${result.jobId}\` · Second opinion: \`review --to <other> --job ${result.jobId}\` · Drop: \`discard ${result.jobId}\``,
       );
     }
   } else if (result.mode === "write" && Array.isArray(result.filesChanged)) {
@@ -179,10 +198,38 @@ export function renderResult(result) {
     for (const notice of result.providerNotices.slice(0, 20)) lines.push(`- ${notice}`);
     lines.push("", "</details>");
   }
-  if (result.nativeSessionId) {
-    lines.push("", `Native session: \`${result.nativeSessionId}\` (resume is provider-specific).`);
+  // A session can only be resumed where it ran: in place, not in a removed worktree.
+  if (result.nativeSessionId && !running && result.executionCwd && result.executionCwd === result.sourceCwd) {
+    lines.push("", `Follow up in the same session: \`continue ${result.jobId} --prompt "..." --background\`.`);
+  }
+  if (!running && result.jobId && !["COMPLETED", "EMPTY_SCOPE"].includes(result.status)) {
+    lines.push("", `Run it again: \`retry ${result.jobId} --background\`, or on another provider: \`retry ${result.jobId} --to <other> --background\`.`);
   }
   return lines.join("\n");
+}
+
+// One markdown table cell: a single line, pipes escaped, clipped.
+function cell(text, max) {
+  const flat = String(text).replace(/[\r\n\t]+/g, " ").replace(/\|/g, "\\|").trim();
+  return flat.length > max ? `${flat.slice(0, max - 3)}...` : flat;
+}
+
+export function renderStats(stats) {
+  if (!stats.length) return "No runs recorded.";
+  const rows = stats.map((entry) => `| ${[
+    entry.provider,
+    entry.jobs,
+    entry.completed,
+    `${Math.round(entry.successRate * 100)}%`,
+    formatDuration(entry.medianDurationMs) || "—",
+    entry.costUsd ? `$${entry.costUsd.toFixed(4)}` : "—",
+    entry.topFailure ? `${entry.topFailure.status} ×${entry.topFailure.count}` : "—",
+  ].join(" | ")} |`);
+  return [
+    "| provider | jobs | completed | success | median time | cost | top failure |",
+    "| --- | --- | --- | --- | --- | --- | --- |",
+    ...rows,
+  ].join("\n");
 }
 
 function renderTotals(runs) {
@@ -201,7 +248,7 @@ export function renderRunsDashboard(runs) {
     return "No runs recorded.";
   }
 
-  const header = "| provider | job | status | pid | model | duration | cost | stream | scope | prompt |";
+  const header = "| provider | job | status | pid | model | duration | cost | activity | scope | prompt |";
   const divider = "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |";
 
   const rows = runs.map((job) => {
@@ -209,25 +256,14 @@ export function renderRunsDashboard(runs) {
     const pid = job.hostPid ? String(job.hostPid) : "—";
     const model = job.model || "—";
     const scope = job.scopeKind || job.scope?.kind || job.mode || "—";
-    const promptPreview = (job.promptSummary || job.prompt || "—")
-      .replace(/[\r\n\t]+/g, " ")
-      .replace(/\|/g, "\\|")
-      .trim();
-    const truncatedPrompt = promptPreview.length > 50
-      ? `${promptPreview.slice(0, 47)}...`
-      : promptPreview;
+    const truncatedPrompt = cell(job.promptSummary || job.prompt || "—", 50);
 
-    // R4: liveness — bytes streamed and silence duration for in-flight jobs.
-    let stream = "—";
-    const hasCounters = typeof job.stdoutBytes === "number" || typeof job.stderrBytes === "number";
-    if (hasCounters) {
-      const bytes = `${job.stdoutBytes ?? 0}+${job.stderrBytes ?? 0}B`;
-      if (job.status === "RUNNING" && job.lastStreamAt) {
-        const silentMs = Date.now() - new Date(job.lastStreamAt).getTime();
-        stream = silentMs < 10_000 ? `${bytes} live` : `${bytes} silent ${Math.round(silentMs / 1000)}s`;
-      } else {
-        stream = bytes;
-      }
+    // What the agent is doing now, or how much it did; silence flags a stuck job.
+    let activity = job.progress?.actions ? `${job.progress.actions} actions` : "—";
+    if (job.status === "RUNNING") {
+      const silentMs = job.lastStreamAt ? Date.now() - new Date(job.lastStreamAt).getTime() : null;
+      const now = job.progress?.lastAction ? cell(job.progress.lastAction, 40) : "working";
+      activity = silentMs !== null && silentMs >= 10_000 ? `${now}, silent ${Math.round(silentMs / 1000)}s` : now;
     }
 
     return `| ${[
@@ -238,7 +274,7 @@ export function renderRunsDashboard(runs) {
       model,
       duration,
       typeof job.costUsd === "number" ? `$${job.costUsd.toFixed(4)}` : "—",
-      stream,
+      activity,
       scope,
       truncatedPrompt || "—",
     ].join(" | ")} |`;

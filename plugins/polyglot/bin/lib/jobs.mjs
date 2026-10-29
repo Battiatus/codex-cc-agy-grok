@@ -239,7 +239,8 @@ export async function readJobTails(jobId, options = {}) {
 // the job RUNNING forever. Anything whose worker is gone becomes STALE.
 async function jobIds(stateHome) {
   try {
-    return await readdir(jobsRoot(stateHome));
+    // Anything else in the folder (.DS_Store, a stray file) is not a job.
+    return (await readdir(jobsRoot(stateHome))).filter((name) => /^[\w-]+$/.test(name));
   } catch (error) {
     if (error?.code === "ENOENT") return [];
     throw error;
@@ -307,9 +308,55 @@ export async function reapStaleJobs(stateHome = null) {
   return reaped;
 }
 
-export async function listJobs({ all = false, repositoryRoot = null, limit = MAX_LISTED_JOBS, stateHome = null } = {}) {
+function median(values) {
+  if (!values.length) return null;
+  const sorted = [...values].sort((left, right) => left - right);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[middle] : Math.round((sorted[middle - 1] + sorted[middle]) / 2);
+}
+
+// Per-provider track record over finished jobs, newest first. `recent` keeps
+// only each provider's last N jobs, so routing follows current behaviour (a
+// fixed login, a broken model) rather than the whole history.
+export function providerStats(jobs, { recent = Infinity } = {}) {
+  const byProvider = new Map();
+  const newestFirst = [...jobs].sort((left, right) => String(right.createdAt).localeCompare(String(left.createdAt)));
+  for (const job of newestFirst) {
+    // Canceled and empty-scope jobs say nothing about the provider.
+    if (!job.connector || !TERMINAL_STATUSES.has(job.status) || ["CANCELED", "EMPTY_SCOPE"].includes(job.status)) continue;
+    const entry = byProvider.get(job.connector) ?? { provider: job.connector, finished: [] };
+    if (entry.finished.length < recent) entry.finished.push(job);
+    byProvider.set(job.connector, entry);
+  }
+  return [...byProvider.values()].map(({ provider, finished }) => {
+    const completed = finished.filter((job) => job.completed);
+    const failures = {};
+    for (const job of finished) if (!job.completed) failures[job.status] = (failures[job.status] || 0) + 1;
+    const [topStatus, topCount] = Object.entries(failures).sort((left, right) => right[1] - left[1])[0] ?? [];
+    return {
+      provider,
+      jobs: finished.length,
+      completed: completed.length,
+      successRate: finished.length ? completed.length / finished.length : 0,
+      medianDurationMs: median(completed.map((job) => job.durationMs).filter((value) => typeof value === "number")),
+      costUsd: finished.reduce((sum, job) => sum + (typeof job.costUsd === "number" ? job.costUsd : 0), 0),
+      topFailure: topStatus ? { status: topStatus, count: topCount } : null,
+    };
+  }).sort((left, right) => right.jobs - left.jobs);
+}
+
+// newJobId embeds the creation time, so `since` skips old jobs without reading
+// their records. An id without a readable time is always read.
+function createdAtFromId(jobId) {
+  // <provider>-<time36>-<hex>: counted from the end, a hyphenated provider id still works.
+  const stamp = parseInt(jobId.split("-").at(-2), 36);
+  return Number.isFinite(stamp) ? stamp : Infinity;
+}
+
+export async function listJobs({ all = false, repositoryRoot = null, limit = MAX_LISTED_JOBS, since = 0, stateHome = null } = {}) {
   const jobs = [];
   for (const jobId of await jobIds(stateHome)) {
+    if (createdAtFromId(jobId) < since) continue;
     const job = await readJsonOrNull(jobPaths(jobId, stateHome).job);
     if (job) jobs.push(decorateJob(job));
   }

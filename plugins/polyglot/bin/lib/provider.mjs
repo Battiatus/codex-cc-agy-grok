@@ -7,7 +7,7 @@ import { buildTargetCommand } from "./exec.mjs";
 import { changedFiles, commitAll, deleteBranch, diffText, resolveScope, treeFingerprint } from "./git.mjs";
 import { collectGarbage, prepareExecutionRoot } from "./isolation.mjs";
 import { buildInvocationArgs, composePrompt } from "./invocation.mjs";
-import { createCapture, parseProviderOutput } from "./parse.mjs";
+import { createCapture, createProgressTracker, parseProviderOutput } from "./parse.mjs";
 import { interpretVerdict, loadSchema, validate } from "./schema.mjs";
 import { appendEvent, jobPaths, nowIso, readJobTails, readJsonOrNull, updateJob, writeJsonAtomic } from "./jobs.mjs";
 
@@ -17,7 +17,7 @@ const PROVIDER_TIMEOUT_MARGIN_MS = 30_000;
 // Windows, 128K per argument on Linux) once a diff is embedded.
 const MAX_ARG_PROMPT_CHARS = process.platform === "win32" ? 30_000 : 120_000;
 
-function chainFromEnv() {
+export function chainFromEnv() {
   return (process.env.AGENT_CONNECTOR_CHAIN || "")
     .split(",")
     .map((entry) => entry.trim())
@@ -162,15 +162,28 @@ async function runTarget({ config, request, paths, executionCwd, prompt, schema,
     }
   };
 
+  const progress = createProgressTracker({ root: executionCwd });
   const HEARTBEAT_FLUSH_MS = 2_000;
+  let trailingFlush = null;
   const flushHeartbeat = (force = false) => {
     const now = Date.now();
-    if (!force && now - lastFlushAt < HEARTBEAT_FLUSH_MS) return;
+    if (!force && now - lastFlushAt < HEARTBEAT_FLUSH_MS) {
+      // A throttled update still lands at the end of the interval, or a long
+      // command started right after another event would never show as current.
+      trailingFlush ??= setTimeout(() => {
+        trailingFlush = null;
+        flushHeartbeat();
+      }, HEARTBEAT_FLUSH_MS - (now - lastFlushAt));
+      return;
+    }
+    clearTimeout(trailingFlush);
+    trailingFlush = null;
     lastFlushAt = now;
     updateJob(request.jobId, {
       lastStreamAt,
       stdoutBytes,
       stderrBytes,
+      progress: progress.snapshot(),
     }).catch(() => {});
   };
 
@@ -206,6 +219,7 @@ async function runTarget({ config, request, paths, executionCwd, prompt, schema,
     }
     stdoutFile.write(chunk);
     stdout.push(chunk);
+    progress.push(chunk);
     stdoutBytes += chunk.length;
     lastStreamAt = nowIso();
     flushHeartbeat();
@@ -368,6 +382,7 @@ export async function executeJob(config, request) {
       cwd: request.cwd,
       jobId: request.jobId,
       isolate: request.isolate,
+      ref: request.worktreeRef ?? null,
     });
     await emit("isolation-ready", { strategy: isolation.strategy, executionCwd: isolation.executionCwd });
 

@@ -113,16 +113,21 @@ export function resolveScope(cwd, { scope = "auto", base = null, commit = null }
 
   if (effective === "commit") {
     if (!commit) throw new Error("--scope commit requires --commit <sha>.");
-    const stat = parseNumstat(git(cwd, ["diff", "--numstat", `${commit}^!`]).stdout);
+    // With a base, every commit from it up to `commit` (a job branch the agent
+    // may have committed to itself); without, that one commit.
+    const range = base ? `${base}..${commit}` : `${commit}^!`;
+    const stat = parseNumstat(git(cwd, ["diff", "--numstat", range]).stdout);
     return {
       kind: "commit",
       requested: scope,
       isGit: true,
       commit,
+      base,
+      range,
       ...stat,
       untracked: [],
       empty: stat.files.length === 0,
-      diffCommand: `git diff ${commit}^!`,
+      diffCommand: `git diff ${range}`,
     };
   }
 
@@ -214,7 +219,7 @@ export function describeScope(scope) {
   if (scope.kind === "workspace") {
     return scope.note ? `the whole workspace (${scope.note})` : "the whole workspace";
   }
-  if (scope.kind === "commit") return `commit ${scope.commit}`;
+  if (scope.kind === "commit") return scope.base ? `commits ${scope.base}..${scope.commit}` : `commit ${scope.commit}`;
   if (scope.kind === "branch") return `branch changes against ${scope.base}`;
   if (scope.kind === "staged") return "staged changes";
   return "uncommitted changes (staged, unstaged and untracked)";
@@ -283,6 +288,29 @@ export function treeFingerprint(cwd) {
   return status.ok && diff.ok ? `${status.stdout}\0${diff.stdout}` : null;
 }
 
+const MAX_PATCH_BYTES = 1024 * 1024 * 1024;
+
+// Brings a job branch's change into the working tree. git apply is
+// all-or-nothing: a hunk that clashes with local edits leaves every file as it
+// was. Run from the repository root, or paths outside cwd are skipped. The
+// patch stays a Buffer end to end: decoding it would corrupt non-UTF-8 text.
+// Returns null on success, or {clash, message}.
+export function applyBranch(cwd, baseRef, branch) {
+  const run = (args, input) => spawnSync("git", args, {
+    cwd, input, windowsHide: true, timeout: GIT_HEAVY_TIMEOUT_MS, maxBuffer: MAX_PATCH_BYTES,
+  });
+  const failure = (result) => result.error?.message || result.stderr?.toString("utf8").trim() || `exit ${result.status}`;
+  const diff = run(["diff", "--binary", "--no-color", "--no-ext-diff", baseRef, branch]);
+  if (diff.error || diff.status !== 0) return { clash: false, message: `git diff failed: ${failure(diff)}` };
+  if (!diff.stdout.length) return { clash: false, message: "the branch holds no change" };
+  const applied = run(["apply", "--whitespace=nowarn"], diff.stdout);
+  return applied.error || applied.status !== 0 ? { clash: true, message: failure(applied) } : null;
+}
+
+export function branchExists(cwd, branch) {
+  return git(cwd, ["show-ref", "--verify", "--quiet", `refs/heads/${branch}`]).ok;
+}
+
 export function deleteBranch(cwd, branch) {
   return git(cwd, ["branch", "-D", branch]);
 }
@@ -304,7 +332,7 @@ export function diffText(cwd, scope) {
   const common = ["--no-color", "--no-ext-diff", "--find-renames"];
   const parts = [];
   if (scope.kind === "commit") {
-    parts.push(git(cwd, ["diff", ...common, `${scope.commit}^!`]).stdout);
+    parts.push(git(cwd, ["diff", ...common, scope.range || `${scope.commit}^!`]).stdout);
   } else if (scope.kind === "branch") {
     parts.push(git(cwd, ["diff", ...common, `${scope.mergeBase}...HEAD`]).stdout);
   } else if (scope.kind === "staged") {

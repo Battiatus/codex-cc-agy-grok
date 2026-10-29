@@ -1,6 +1,6 @@
 ---
 description: Have another agent CLI fix a failing build or test on a separate polyglot/<job-id> branch
-argument-hint: '--to codex|claude|grok|agy|copilot|qwen|opencode [--prompt "<task>"] [--error "<error-log>"] [--test "<test-command>"] [--model <model>] [--effort <level>] [--timeout 20m]'
+argument-hint: '--to auto|codex|claude|grok|agy|copilot|qwen|opencode [--prompt "<task>"] [--error "<error-log>"] [--test "<test-command>"] [--model <model>] [--effort <level>] [--timeout 20m]'
 allowed-tools: Bash(node:*), Bash(git:*), AskUserQuestion
 ---
 
@@ -18,4 +18,4 @@ node "${CLAUDE_PLUGIN_ROOT}/bin/agent-bridge.mjs" wait <job-id> --format markdow
 
 Give the `wait` call a Bash timeout of 600000 ms. Exit code 3 means the job is still running: call `wait` again.
 
-Report the terminal status, every changed file and the Inspect / Apply / Discard commands from the result. Never apply the branch without asking. Never treat a zero exit code from the provider as success: only `status: COMPLETED` is.
+Report the terminal status, every changed file and the inspect command from the result. Never apply the branch without asking; when the user agrees, run `apply <job-id>` (all or nothing). Offer a second opinion with `review --to <other> --job <job-id>`. Never treat a zero exit code from the provider as success: only `status: COMPLETED` is.

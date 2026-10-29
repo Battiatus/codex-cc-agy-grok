@@ -10,7 +10,7 @@
 ### **La Passerelle Multi-Agents Ultime & Solutions `/boost`**
 ### *The Ultimate Cross-Agent Bridge for Claude Code, OpenAI Codex, xAI Grok & Google Antigravity*
 
-[![Version](https://img.shields.io/badge/version-0.4.0-58a6ff?style=flat-square&labelColor=161b22)](package.json)
+[![Version](https://img.shields.io/badge/version-0.5.0-58a6ff?style=flat-square&labelColor=161b22)](package.json)
 [![QA Tests](https://img.shields.io/badge/tests-npm%20run%20qa-3fb950?style=flat-square&labelColor=161b22)](tests/)
 [![Providers](https://img.shields.io/badge/providers-7%20agents-c9d1d9?style=flat-square&labelColor=161b22)](#📊-cross-agent-provider-comparison-matrix)
 [![Solutions /boost](https://img.shields.io/badge/%2Fboost-multi--agent%20delegation-d29922?style=flat-square&labelColor=161b22)](docs/boost-solutions.md)
@@ -52,16 +52,16 @@
 
 ### Comment fonctionne la passerelle entre Claude Code, Codex, Grok et Antigravity ?
 
-Chaque agent IA possède des forces uniques. Plutôt que de copier-coller manuellement du code d'un terminal à l'autre, **Polyglot Agent Connectors** installe **un seul plugin, `polyglot`** : un pont unifié (`plugins/polyglot/bin/agent-bridge.mjs`), 11 commandes slash (`/polyglot:review`, `/polyglot:adversarial-review`, `/polyglot:rescue`, `/polyglot:delegate`, `/polyglot:handoff`, `/polyglot:wait`, `/polyglot:runs`, `/polyglot:status`, `/polyglot:result`, `/polyglot:cancel`, `/polyglot:setup`), un skill `delegate` et un agent `delegate` dans chaque environnement hôte. Chaque commande de job prend `--to codex|claude|grok|agy|copilot|qwen|opencode`.
+Chaque agent IA possède des forces uniques. Plutôt que de copier-coller manuellement du code d'un terminal à l'autre, **Polyglot Agent Connectors** installe **un seul plugin, `polyglot`** : un pont unifié (`plugins/polyglot/bin/agent-bridge.mjs`), 15 commandes slash (`/polyglot:review`, `/polyglot:adversarial-review`, `/polyglot:rescue`, `/polyglot:delegate`, `/polyglot:handoff`, `/polyglot:wait`, `/polyglot:runs`, `/polyglot:status`, `/polyglot:result`, `/polyglot:cancel`, `/polyglot:setup`, `/polyglot:apply`, `/polyglot:discard`, `/polyglot:retry`, `/polyglot:continue`), un skill `delegate` et un agent `delegate` dans chaque environnement hôte. Chaque commande de job prend `--to codex|claude|grok|agy|copilot|qwen|opencode`, ou `--to auto` pour le provider installé et connecté au meilleur taux de réussite récent.
 
-Flux recommandé : lancer le job avec `--background`, puis bloquer sur `wait <job-id>`. Pour solliciter plusieurs agents, lancez un job en arrière-plan par provider, puis `wait id1 id2`.
+Flux recommandé : lancer le job avec `--background`, puis bloquer sur `wait <job-id>`. Pour solliciter plusieurs agents, lancez un job en arrière-plan par provider, puis `wait id1 id2`. Sur Claude Code, inutile de bloquer : au message suivant, un hook annonce les jobs terminés (verdict, findings, branche, coût). Pendant qu'un job tourne, `status <id>` montre ce que fait l'agent (action en cours, dernières actions, tokens et coût).
 
 | Pilier `/boost` | Commande Clé | Objectif & Valeur Ajoutée | Garantie de Sécurité |
 | :--- | :--- | :--- | :--- |
 | **1. Délégation Multi-Agents** | `run --to <provider> --prompt "<tâche>"` | Déléguer chaque tâche à l'agent optimal : architecture à **Claude Code**, algorithmique complexe à **Codex**, audit rapide à **Grok**, planification à **Antigravity**. | Lecture seule (`review`) par défaut ; sandbox OS, liste blanche d'outils ou mode plan selon l'agent. |
 | **2. Revue Red Team Contradictoire** | `adversarial-review --to <provider> --focus "<cible>"` | Briser le biais de confirmation en faisant auditer le code d'un agent par un agent concurrent spécialisé en sécurité et cas limites. | Verdict structuré et validé par JSON Schema (`approve`, `needs-attention`, `could-not-review`). |
-| **3. Auto-Sauvetage Résilient** | `rescue --to <provider> --error "<log>" --test "<cmd>" --confirm-write` | Faire corriger un build ou des tests unitaires cassés par l'agent cible, en mode écriture (`write`). | Travail dans un worktree Git sur la branche `polyglot/<job-id>` : votre arbre de travail n'est jamais modifié. Vous inspectez, appliquez ou supprimez la branche. |
-| **4. Supervision Temps Réel** | `runs`, `wait <id>` & `status <id> --follow` | Suivre les jobs en arrière-plan dans un tableau de bord unifié (PIDs, durée live, modèle, coût, flux `stdout`/`stderr`) et attendre leurs résultats. | Journal d'événements `events.ndjson` et marquage `STALE` des jobs dont le worker a disparu. |
+| **3. Auto-Sauvetage Résilient** | `rescue --to <provider> --error "<log>" --test "<cmd>" --confirm-write` | Faire corriger un build ou des tests unitaires cassés par l'agent cible, en mode écriture (`write`). | Travail dans un worktree Git sur la branche `polyglot/<job-id>` : votre arbre de travail n'est jamais modifié. Vous l'inspectez, la faites relire par un autre agent (`review --job <id>`), l'appliquez (`apply <id>`, tout ou rien) ou la supprimez (`discard <id>`). |
+| **4. Supervision Temps Réel** | `runs`, `wait <id>`, `status <id>`, `runs --stats` | Voir en direct l'action en cours de chaque agent, attendre les résultats, relancer (`retry <id> [--to autre]`), poursuivre la session (`continue <id>`) et comparer les providers (taux de réussite, durée, coût). | Journal d'événements `events.ndjson` et marquage `STALE` des jobs dont le worker a disparu. |
 
 ---
 
@@ -207,7 +207,14 @@ node plugins/polyglot/bin/agent-bridge.mjs rescue --to agy `
   --test "npm test" `
   --confirm-write --background
 ```
-The result prints the changed files and three commands: **Inspect** (`git diff <base> <branch>`), **Apply** (`git diff <base> <branch> | git apply`) and **Discard** (`git branch -D <branch>`).
+The result prints the changed files and the inspect command (`git diff <base> <branch>`). Then:
+```powershell
+# Have another agent review the branch, in a worktree of that branch
+node plugins/polyglot/bin/agent-bridge.mjs review --to claude --job <job-id> --background
+# Apply it to the working tree (all or nothing; nothing is staged), or drop it
+node plugins/polyglot/bin/agent-bridge.mjs apply <job-id>
+node plugins/polyglot/bin/agent-bridge.mjs discard <job-id>
+```
 
 ### 📊 4. Multi-Agent Supervision Dashboard (`runs`, `wait` & `status`)
 ```powershell
@@ -219,8 +226,15 @@ node plugins/polyglot/bin/agent-bridge.mjs status <job-id> --tail 25 --format ma
 
 # Follow a background job live until completion
 node plugins/polyglot/bin/agent-bridge.mjs status <job-id> --follow
+
+# Track record per provider: success rate, median time, cost, usual failure
+node plugins/polyglot/bin/agent-bridge.mjs runs --stats --format markdown
+
+# Run a job again (on another provider), or follow up in its session
+node plugins/polyglot/bin/agent-bridge.mjs retry <job-id> --to grok --background
+node plugins/polyglot/bin/agent-bridge.mjs continue <job-id> --prompt "And the tests?" --background
 ```
-The `runs` table shows `provider | job | status | pid | model | duration | cost | stream | scope | prompt`, plus a totals line (jobs per status, total cost). `status` without an id prints the same dashboard.
+The `runs` table shows `provider | job | status | pid | model | duration | cost | activity | scope | prompt`, plus a totals line (jobs per status, total cost). For a running job, `activity` is the agent's current action (tool, file, command), read from the provider's event stream; `status <id>` adds the last five actions and the output tokens and cost so far. `status` without an id prints the same dashboard.
 
 ---
 
@@ -236,7 +250,7 @@ The `runs` table shows `provider | job | status | pid | model | duration | cost 
   - `COMPLETED_WITH_DENIALS`: Target encountered permission blocks (`completed: false`).
   - `SEMANTIC_MISMATCH`: Output did not match `--expect-response`.
 - **Bridge Exit Codes**: `0` COMPLETED, `2` finished but not completed, `3` still running (`wait` timed out), `1` bridge error.
-- **Isolated Write Branch**: `write` and `rescue` require `--confirm-write` and run in a git worktree on a `polyglot/<job-id>` branch. Your working tree is never written by the bridge (a job is flagged `sourceTreeModified` if the agent wrote there anyway), `filesChanged` is the exact diff `base..branch`, and the result gives Inspect / Apply / Discard commands. Write mode outside a git repository is refused, and `cancel` discards the job's branch.
+- **Isolated Write Branch**: `write` and `rescue` require `--confirm-write` and run in a git worktree on a `polyglot/<job-id>` branch. Your working tree is never written by the bridge (a job is flagged `sourceTreeModified` if the agent wrote there anyway), `filesChanged` is the exact diff `base..branch`, and nothing reaches your working tree until you run `apply <job-id>` (all or nothing). Write mode outside a git repository is refused, and `cancel` discards the job's branch.
 - **Cycle & Depth Guard**: `AGENT_CONNECTOR_CHAIN` blocks circular agent loops and caps delegation depth at 3 hops.
 - **Zero Credential Storage**: The bridge inherits your local CLI login (`claude`, `codex`, `grok`, `agy`, `copilot`, `qwen`, `opencode`). API keys are never read, copied, or stored. Job state lives in `~/.agent-connectors/jobs/<job-id>/` (override with `AGENT_CONNECTOR_HOME`).
 
@@ -273,7 +287,7 @@ Tests run against a mock provider. `npm run test:real` (`tests/real-cli.test.mjs
   "alternateName": "Passerelle Multi-Agents Claude Code, Codex, Grok, Antigravity & Solutions /boost",
   "applicationCategory": "DeveloperApplication",
   "operatingSystem": "Windows, macOS, Linux",
-  "softwareVersion": "0.4.0",
+  "softwareVersion": "0.5.0",
   "license": "https://opensource.org/licenses/MIT",
   "url": "https://github.com/Battiatus/codex-cc-agy-grok",
   "description": "Passerelle multi-agents locale et solutions /boost permettant de déléguer des tâches entre Claude Code, OpenAI Codex, xAI Grok Build, Google Antigravity, GitHub Copilot, Qwen Code et OpenCode avec revue Red Team contradictoire et rescue sur branche Git isolée.",

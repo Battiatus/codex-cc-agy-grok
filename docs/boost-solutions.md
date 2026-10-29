@@ -76,7 +76,7 @@ node plugins/polyglot/bin/agent-bridge.mjs rescue --to agy \
   --test "npm test" \
   --confirm-write --background
 ```
-When the job finishes, the result lists every changed file (the exact diff `base..branch`) and three commands: **Inspect** (`git diff <base> <branch>`), **Apply** (`git diff <base> <branch> | git apply`) or **Discard** (`git branch -D <branch>`). `cancel` discards the branch of a running write job.
+When the job finishes, the result lists every changed file (the exact diff `base..branch`) and the inspect command (`git diff <base> <branch>`). Then `review --to <other> --job <job-id>` has another agent review the branch, `apply <job-id>` applies it to the working tree (all or nothing, nothing staged) and `discard <job-id>` deletes it. `cancel` discards the branch of a running write job.
 
 ### Pillar 4: Supervision & Wait
 Background jobs need visibility. The `/boost` suite integrates a unified dashboard across providers and a `wait` command that blocks until jobs finish and returns their full results:

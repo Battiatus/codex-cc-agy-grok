@@ -1,6 +1,6 @@
 ---
 description: Red Team review of the current git scope by another agent CLI, focused on security, edge cases and failure modes
-argument-hint: '--to codex|claude|grok|agy|copilot|qwen|opencode [--focus <area>] [--scope auto|uncommitted|staged|branch|commit|workspace] [--base <ref>] [--commit <sha>] [--isolate] [--model <model>] [--effort <level>] [--timeout 10m]'
+argument-hint: '--to auto|codex|claude|grok|agy|copilot|qwen|opencode [--focus <area>] [--scope auto|uncommitted|staged|branch|commit|workspace] [--base <ref>] [--commit <sha>] [--isolate] [--model <model>] [--effort <level>] [--timeout 10m]'
 disable-model-invocation: true
 allowed-tools: Bash(node:*), Bash(git:*), AskUserQuestion
 ---
