@@ -7,8 +7,8 @@
   <!-- Primary Meta Tags -->
   <title>Polyglot Agent Connectors — Passerelle Multi-Agents Claude Code, Codex, Grok, Antigravity & Solutions /boost</title>
   <meta name="title" content="Polyglot Agent Connectors — Passerelle Multi-Agents Claude Code, Codex, Grok, Antigravity & Solutions /boost" />
-  <meta name="description" content="La passerelle locale de référence et solutions /boost pour interconnecter et déléguer des tâches entre Claude Code, OpenAI Codex, xAI Grok Build et Google Antigravity. Sécurité zero-credential, revue Red Team et rollback Git." />
-  <meta name="keywords" content="passerelle claude code codex grok antigravity, deleguer taches entre agents, solutions boost, cross agent bridge, multi agent task delegation, adversarial code review, git rollback rescue, cli bridge" />
+  <meta name="description" content="La passerelle locale de référence et solutions /boost pour interconnecter et déléguer des tâches entre Claude Code, OpenAI Codex, xAI Grok Build et Google Antigravity. Sécurité zero-credential, revue Red Team et rescue sur branche Git isolée." />
+  <meta name="keywords" content="passerelle claude code codex grok antigravity, deleguer taches entre agents, solutions boost, cross agent bridge, multi agent task delegation, adversarial code review, git worktree rescue, cli bridge" />
   <meta name="author" content="Polyglot Connectors Contributors" />
   <meta name="robots" content="index, follow" />
   <link rel="canonical" href="https://battiatus.github.io/codex-cc-agy-grok/" />
@@ -41,11 +41,11 @@
         "alternateName": "Passerelle Multi-Agents Claude Code, Codex, Grok, Antigravity & Solutions /boost",
         "applicationCategory": "DeveloperApplication",
         "operatingSystem": "Windows, macOS, Linux",
-        "softwareVersion": "0.3.0",
+        "softwareVersion": "0.5.0",
         "license": "https://opensource.org/licenses/MIT",
         "url": "https://battiatus.github.io/codex-cc-agy-grok/",
-        "description": "Passerelle multi-agents locale et solutions /boost permettant de déléguer des tâches entre Claude Code, OpenAI Codex, xAI Grok Build, Google Antigravity, GitHub Copilot, Qwen Code et OpenCode avec revue Red Team contradictoire et auto-rescue Git rollback.",
-        "keywords": "passerelle claude code codex grok antigravity, déléguer des tâches entre les agents, solutions /boost, cross-agent bridge, multi-agent task delegation, adversarial code review, git rollback rescue",
+        "description": "Passerelle multi-agents locale et solutions /boost permettant de déléguer des tâches entre Claude Code, OpenAI Codex, xAI Grok Build, Google Antigravity, GitHub Copilot, Qwen Code et OpenCode avec revue Red Team contradictoire et rescue sur branche Git isolée.",
+        "keywords": "passerelle claude code codex grok antigravity, déléguer des tâches entre les agents, solutions /boost, cross-agent bridge, multi-agent task delegation, adversarial code review, git worktree rescue",
         "offers": {
           "@type": "Offer",
           "price": "0",
@@ -60,7 +60,7 @@
             "name": "Comment fonctionne la passerelle entre Claude Code, Codex, Grok et Antigravity ?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Polyglot Agent Connectors installe un pont unifié local (agent-bridge.mjs) qui permet à chaque agent CLI de router et déléguer des tâches à ses pairs via des manifestes natifs, avec isolation sécurisée (worktree Git ou sandbox OS) et sans stockage d'identifiants."
+              "text": "Polyglot Agent Connectors installe un pont unifié local (agent-bridge.mjs) qui permet à chaque agent CLI de router et déléguer des tâches à ses pairs via un plugin unique (polyglot) et des manifestes natifs, avec isolation sécurisée (worktree Git ou sandbox OS) et sans stockage d'identifiants."
             }
           },
           {
@@ -68,7 +68,7 @@
             "name": "Qu'apportent les solutions /boost dans un flux multi-agents ?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Les solutions /boost couvrent 4 piliers essentiels : la délégation de tâches spécialisées, la revue Red Team contradictoire (adversarial-review), l'auto-sauvetage résilient avec snapshot Git (rescue rollbackRef) et la supervision en direct des jobs (runs et status --follow)."
+              "text": "Les solutions /boost couvrent 4 piliers essentiels : la délégation de tâches spécialisées, la revue Red Team contradictoire (adversarial-review), l'auto-sauvetage résilient sur une branche Git isolée (rescue, polyglot/<job-id>) et la supervision des jobs (runs, wait et status --follow)."
             }
           },
           {
@@ -76,7 +76,7 @@
             "name": "Les clés d'API sont-elles exposées ou partagées entre agents ?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Non. Le modèle de sécurité applique le principe du Zero Credential Leak. Chaque connecteur réutilise la session d'authentification locale du CLI hôte (claude auth login, codex login, grok login, agy) sans jamais lire ni transmettre de clés API."
+              "text": "Non. Le modèle de sécurité applique le principe du Zero Credential Leak. Le pont réutilise la session d'authentification locale de chaque CLI cible (claude auth login, codex login, grok login, agy) sans jamais lire ni transmettre de clés API."
             }
           }
         ]
@@ -443,7 +443,7 @@
       <ul class="nav-links">
         <li><a href="#solutions-boost">Solutions /boost</a></li>
         <li><a href="#terminal">Aperçu Terminal</a></li>
-        <li><a href="#comparatif">7 Connecteurs</a></li>
+        <li><a href="#comparatif">7 Agents</a></li>
         <li><a href="#quickstart">Installation</a></li>
         <li><a href="#faq">FAQ</a></li>
       </ul>
@@ -451,7 +451,7 @@
         <svg height="16" width="16" viewBox="0 0 16 16" fill="currentColor">
           <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
         </svg>
-        GitHub · v0.3.0
+        GitHub · v0.5.0
       </a>
     </div>
   </header>
@@ -461,14 +461,14 @@
     <section class="hero">
       <div class="pill-badge">
         <span class="pill-dot"></span>
-        <span>v0.3.0 · 73/73 QA tests passants · Zero Credential Leak</span>
+        <span>v0.5.0 · QA : npm run qa · Zero Credential Leak</span>
       </div>
       <h1>
         La Passerelle Multi-Agents Ultime<br/>
         <span class="gradient">&amp; Solutions /boost</span>
       </h1>
       <p class="lead">
-        Interconnectez <strong>Claude Code</strong>, <strong>OpenAI Codex</strong>, <strong>xAI Grok Build</strong> et <strong>Google Antigravity</strong> dans un maillage autonome et symétrique. Déléguez des tâches spécialisées, déclenchez des revues de code contradictoires Red Team et réparez automatiquement vos builds avec rollback Git garanti.
+        Interconnectez <strong>Claude Code</strong>, <strong>OpenAI Codex</strong>, <strong>xAI Grok Build</strong> et <strong>Google Antigravity</strong> dans un maillage autonome et symétrique. Déléguez des tâches spécialisées, déclenchez des revues de code contradictoires Red Team et faites réparer vos builds par un agent sur une branche Git isolée.
       </p>
       <div class="hero-actions">
         <a href="#quickstart" class="btn-primary">Démarrer en 1 minute</a>
@@ -484,7 +484,7 @@
     <!-- Four Boost Pillars -->
     <section id="solutions-boost">
       <h2 class="section-title">⚡ Les 4 Piliers des Solutions /boost</h2>
-      <p class="section-desc">Pourquoi restreindre un projet à un seul agent de codage ? Orchestrez la complémentarité de vos agents IA préférés.</p>
+      <p class="section-desc">Pourquoi restreindre un projet à un seul agent de codage ? Exploitez la complémentarité de vos agents IA préférés.</p>
 
       <div class="pillars-grid">
         <div class="pillar-card">
@@ -500,36 +500,36 @@
         <div class="pillar-card">
           <span class="pillar-icon">PILIER 03</span>
           <h3 class="pillar-title">Auto-Sauvetage Résilient</h3>
-          <p>La commande <code>rescue</code> répare automatiquement un test cassé en mode écriture, tout en capturant un instantané <code>git stash create</code> (<code>rollbackRef</code>) pour annuler immédiatement en cas d'imprévu.</p>
+          <p>La commande <code>rescue</code> confie la réparation d'un test cassé à un agent en mode écriture, dans un worktree Git sur la branche <code>polyglot/&lt;job-id&gt;</code> : votre arbre de travail n'est jamais modifié, et vous inspectez, appliquez ou supprimez la branche.</p>
         </div>
         <div class="pillar-card">
           <span class="pillar-icon">PILIER 04</span>
           <h3 class="pillar-title">Supervision en Direct</h3>
-          <p>Tableau de bord unifié <code>runs</code> et suivi des logs en continu (<code>status &lt;job-id&gt; --follow</code>) avec PIDs système, durées de vie en direct et journal d'événements NDJSON.</p>
+          <p>Tableau de bord unifié <code>runs</code>, attente des résultats (<code>wait &lt;job-id&gt;</code>) et suivi du journal d'événements en continu (<code>status &lt;job-id&gt; --follow</code>) avec PIDs système, durées en direct, coût et journal NDJSON.</p>
         </div>
       </div>
     </section>
 
     <!-- Terminal Preview Section -->
     <section id="terminal" class="terminal-section">
-      <h2 class="section-title">🖥️ Aperçu Terminal Authentique (CLI Runs)</h2>
-      <p class="section-desc">Reproduction exacte des sorties réelles du moteur <code>agent-bridge.mjs</code> sans extrapolation.</p>
+      <h2 class="section-title">🖥️ Aperçu Terminal (CLI Runs)</h2>
+      <p class="section-desc">Aperçu illustratif des sorties du moteur <code>agent-bridge.mjs</code> (<code>adversarial-review</code>, <code>runs</code>).</p>
       
       <div class="banner-wrapper">
         <img src="assets/terminal-preview.svg" alt="Aperçu Terminal agent-bridge.mjs" width="1120" height="576" />
       </div>
     </section>
 
-    <!-- 7 Connectors Matrix -->
+    <!-- 7 Agents Matrix -->
     <section id="comparatif">
-      <h2 class="section-title">📊 Matrice Comparative des 7 Connecteurs</h2>
-      <p class="section-desc">Chaque connecteur s'intègre nativement à son CLI cible en réutilisant ses identifiants locaux existants.</p>
+      <h2 class="section-title">📊 Matrice Comparative des 7 Agents</h2>
+      <p class="section-desc">Chaque agent est piloté par une config JSON dédiée (<code>plugins/polyglot/bin/providers/</code>) et réutilise les identifiants locaux existants de son CLI.</p>
 
       <div class="table-wrapper">
         <table>
           <thead>
             <tr>
-              <th>Connecteur</th>
+              <th>Agent</th>
               <th>CLI Cible</th>
               <th>Mode d'Isolation</th>
               <th>Contrat de Verdict</th>
@@ -538,52 +538,52 @@
           </thead>
           <tbody>
             <tr>
-              <td><strong>codex-connector</strong></td>
+              <td><strong>codex</strong></td>
               <td><code>codex exec</code></td>
               <td>OS Sandbox natif</td>
               <td>JSON Schema strict</td>
               <td>Zero-credential leak</td>
             </tr>
             <tr>
-              <td><strong>claude-connector</strong></td>
+              <td><strong>claude</strong></td>
               <td><code>claude</code></td>
               <td>Tool Allowlist (read-only)</td>
               <td>JSON Schema inline</td>
               <td>Zero-credential leak</td>
             </tr>
             <tr>
-              <td><strong>grok-connector</strong></td>
+              <td><strong>grok</strong></td>
               <td><code>grok</code></td>
               <td>Tool Allowlist (Grok Build)</td>
-              <td>JSON Schema strict</td>
+              <td>JSON Schema inline</td>
               <td>Zero-credential leak</td>
             </tr>
             <tr>
-              <td><strong>agy-connector</strong></td>
+              <td><strong>agy</strong></td>
               <td><code>agy</code></td>
               <td>Plan Mode &amp; Scoped Dirs</td>
               <td>JSON Schema strict</td>
               <td>Zero-credential leak</td>
             </tr>
             <tr>
-              <td><strong>copilot-connector</strong></td>
-              <td><code>gh copilot</code></td>
-              <td>Tool Allowlist</td>
-              <td>JSON Schema strict</td>
+              <td><strong>copilot</strong></td>
+              <td><code>copilot</code></td>
+              <td>Deny-tool (write, shell)</td>
+              <td>Schéma dans le prompt, validé par le pont</td>
               <td>Zero-credential leak</td>
             </tr>
             <tr>
-              <td><strong>qwen-connector</strong></td>
+              <td><strong>qwen</strong></td>
               <td><code>qwen</code></td>
-              <td>Worktree Isolation</td>
-              <td>JSON Schema strict</td>
+              <td>Plan Approval Mode</td>
+              <td>JSON Schema inline</td>
               <td>Zero-credential leak</td>
             </tr>
             <tr>
-              <td><strong>opencode-connector</strong></td>
-              <td><code>opencode</code></td>
-              <td>Worktree Isolation</td>
-              <td>JSON Schema strict</td>
+              <td><strong>opencode</strong></td>
+              <td><code>opencode run</code></td>
+              <td>Permission env (edit, bash refusés)</td>
+              <td>Schéma dans le prompt, validé par le pont</td>
               <td>Zero-credential leak</td>
             </tr>
           </tbody>
@@ -594,20 +594,22 @@
     <!-- Quickstart Section -->
     <section id="quickstart">
       <h2 class="section-title">🚀 Installation &amp; Prise en Main Immédiate</h2>
-      <p class="section-desc">Installez la suite de connecteurs sur tous vos hôtes d'agents en mode aperçu ou appliqué.</p>
+      <p class="section-desc">Installez le plugin <code>polyglot</code> sur tous vos hôtes d'agents en mode aperçu ou appliqué.</p>
 
       <div class="code-box">
         <span class="comment"># 1. Cloner le dépôt</span><br/>
         <span class="cmd">git clone</span> https://github.com/Battiatus/codex-cc-agy-grok.git<br/>
         <span class="cmd">cd</span> codex-cc-agy-grok<br/><br/>
-        <span class="comment"># 2. Exécuter la suite d'assurance qualité (73/73 tests)</span><br/>
+        <span class="comment"># 2. Exécuter la suite d'assurance qualité</span><br/>
         <span class="cmd">npm run qa</span><br/><br/>
         <span class="comment"># 3. Prévisualiser l'installation multi-hôtes (Dry-Run sans risque)</span><br/>
-        <span class="cmd">node scripts/install.mjs</span> <span class="flag">--host all --plugin all</span><br/><br/>
+        <span class="cmd">node scripts/install.mjs</span> <span class="flag">--host all</span><br/><br/>
         <span class="comment"># 4. Appliquer sur tous vos environnements hôtes</span><br/>
-        <span class="cmd">node scripts/install.mjs</span> <span class="flag">--host all --plugin all --apply</span><br/><br/>
+        <span class="cmd">node scripts/install.mjs</span> <span class="flag">--host all --apply</span><br/><br/>
         <span class="comment"># 5. Déclencher un audit contradictoire Red Team</span><br/>
-        <span class="cmd">node plugins/grok-connector/bin/agent-bridge.mjs adversarial-review</span> <span class="flag">--focus "security, race conditions"</span>
+        <span class="cmd">node plugins/polyglot/bin/agent-bridge.mjs adversarial-review</span> <span class="flag">--to grok --focus "security, race conditions" --background</span><br/><br/>
+        <span class="comment"># 6. Attendre et lire le résultat</span><br/>
+        <span class="cmd">node plugins/polyglot/bin/agent-bridge.mjs wait</span> <span class="flag">&lt;job-id&gt; --format markdown</span>
       </div>
     </section>
 
@@ -618,17 +620,17 @@
 
       <div class="faq-item">
         <h3 class="faq-question">Comment fonctionne la passerelle entre Claude Code, Codex, Grok et Antigravity ?</h3>
-        <p class="faq-answer">Polyglot Agent Connectors fournit un pont unifié qui convertit les commandes slash et requêtes de délégation en invocations locales sécurisées. Chaque agent reçoit les diffs Git isolés dans un snapshot ou un worktree détaché, et renvoie un verdict typé conforme au schéma JSON.</p>
+        <p class="faq-answer">Polyglot Agent Connectors fournit un pont unifié qui convertit les commandes slash et requêtes de délégation en invocations locales sécurisées. Chaque agent reçoit le diff Git exact dans son prompt (lecture seule par défaut, worktree détaché avec <code>--isolate</code>), et renvoie un verdict typé conforme au schéma JSON.</p>
       </div>
 
       <div class="faq-item">
         <h3 class="faq-question">Les identifiants et clés API sont-ils partagés entre agents ?</h3>
-        <p class="faq-answer">Non. La passerelle applique une politique stricte de Zero Credential Leak : aucun jeton n'est partagé ou inspecté. Chaque connecteur réutilise simplement la session locale authentifiée de son CLI hôte respectif.</p>
+        <p class="faq-answer">Non. La passerelle applique une politique stricte de Zero Credential Leak : aucun jeton n'est partagé ou inspecté. Le pont réutilise simplement la session locale authentifiée du CLI cible.</p>
       </div>
 
       <div class="faq-item">
-        <h3 class="faq-question">Comment l'auto-rescue garantit-il l'absence de perte de données ?</h3>
-        <p class="faq-answer">Avant toute écriture sur le disque, le pont appelle <code>git stash create</code> pour capturer l'état exact du dépôt. Le SHA retourné (<code>rollbackRef</code>) est conservé dans le registre de travail, permettant d'annuler les modifications en une seule commande en cas d'anomalie.</p>
+        <h3 class="faq-question">Comment l'auto-rescue protège-t-il mon arbre de travail ?</h3>
+        <p class="faq-answer">Le mode écriture exige <code>--confirm-write</code> et s'exécute dans un worktree Git sur la branche <code>polyglot/&lt;job-id&gt;</code>. Votre arbre de travail n'est jamais modifié : le résultat liste les fichiers changés ; <code>review --job &lt;id&gt;</code> fait relire la branche par un autre agent, <code>apply &lt;id&gt;</code> l'applique (tout ou rien) et <code>discard &lt;id&gt;</code> la supprime.</p>
       </div>
     </section>
   </main>

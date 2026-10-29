@@ -20,17 +20,8 @@ jobs:
         with:
           node-version: 22
 
-      # Validation runs before the build so a committed artifact that no longer
-      # matches src/ fails here instead of being silently regenerated.
-      - name: Validate manifests, contracts and build freshness
+      - name: Validate manifests and provider contracts
         run: npm run validate
 
       - name: Test
         run: npm test
-
-      - name: Rebuild and confirm the tree is unchanged
-        run: npm run build
-
-      - name: Fail on uncommitted build output
-        run: git diff --exit-code
-        shell: bash

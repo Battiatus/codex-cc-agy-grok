@@ -1,64 +1,77 @@
 # Polyglot Agent Connectors: Full Technical Specification & AI Indexing Reference
 
 ## 1. Project Identity & Purpose
-- **Repository**: `codex-cc-agy-grok` (Polyglot Agent Connectors)
+- **Repository**: `codex-cc-agy-grok` (Polyglot Agent Connectors), version 0.5.0
 - **Canonical URL**: `https://github.com/Battiatus/codex-cc-agy-grok`
 - **Purpose**: A production-grade, symmetrical multi-agent bridge and delegation layer connecting autonomous coding agents (Claude Code, OpenAI Codex, xAI Grok Build, Google Antigravity, GitHub Copilot, Qwen Code, and OpenCode).
-- **Core Search Keywords (FR)**: passerelle entre claude code, codex, grok et antigravity; passerelle multi-agents; déléguer des tâches entre les agents; déléguer tâches agents IA; solutions /boost; revue de code contradictoire red team; auto-sauvetage résilience git rollback; supervision multi-agents runs en direct; zéro fuite de clés api.
-- **Core Search Keywords (EN)**: cross-agent bridge between claude code, codex, grok, and antigravity; multi-agent task delegation; /boost solutions; peer-to-peer agent bridge; adversarial red team code review; autonomous rescue git rollback; unified multi-agent supervision dashboard; fail-closed schema verification; zero credential leakage.
+- **Packaging**: One plugin (`plugins/polyglot`), one bridge (`plugins/polyglot/bin/agent-bridge.mjs`), one `delegate` skill, one `delegate` agent and 15 slash commands (`/polyglot:review`, `adversarial-review`, `rescue`, `delegate`, `handoff`, `wait`, `runs`, `status`, `result`, `cancel`, `setup`, `apply`, `discard`, `retry`, `continue`). There is no `src/` and no build step.
+- **Core Search Keywords (FR)**: passerelle entre claude code, codex, grok et antigravity; passerelle multi-agents; déléguer des tâches entre les agents; déléguer tâches agents IA; solutions /boost; revue de code contradictoire red team; rescue sur branche git isolée; supervision des jobs multi-agents runs; zéro fuite de clés api.
+- **Core Search Keywords (EN)**: cross-agent bridge between claude code, codex, grok, and antigravity; multi-agent task delegation; /boost solutions; peer-to-peer agent bridge; adversarial red team code review; autonomous rescue on an isolated git branch; unified job supervision dashboard; fail-closed schema verification; zero credential leakage.
 
 ---
 
 ## 2. Supported Agents & Provider Contracts
-The bridge operates across 7 connector plugins located in `plugins/<connector>-connector`:
+The bridge operates across 7 providers, each declared in `plugins/polyglot/bin/providers/<id>.json`. Every job command takes `--to codex|claude|grok|agy|copilot|qwen|opencode`. The diff-embedding prompt is never a command-line argument: it goes on stdin (or in a prompt file for Grok), which avoids `spawn ENAMETOOLONG` on Windows with large diffs.
 
-1. **`codex-connector` (OpenAI Codex)**:
-   - Target Binary: `codex` (`exec`, `resume`)
+1. **`codex` (OpenAI Codex)**:
+   - Target Binary: `codex` (`exec`, `exec resume`)
    - Sandboxing: Native OS sandbox isolation (`--sandbox read-only` or `--sandbox workspace-write`)
+   - Prompt: stdin (`exec -`)
    - Output Schema: File-based JSON schema via `--output-schema` and final message output via `-o`
    - Reasoning: Configurable via model reasoning effort (`model_reasoning_effort="{effort}"`)
 
-2. **`claude-connector` (Claude Code)**:
-   - Target Binary: `claude`
+2. **`claude` (Claude Code)**:
+   - Target Binary: `claude` (`-p`)
    - Sandboxing: Tool allowlisting (`--allowedTools Read,Glob,Grep` in review; `Read,Glob,Grep,Edit,Write,Bash` in write)
+   - Prompt: stdin
    - Output Schema: Inline JSON schema via `--json-schema`
    - Cost & Budget: Supports `--max-budget-usd` constraints and native session resume (`--resume`)
 
-3. **`grok-connector` (xAI Grok Build)**:
+3. **`grok` (xAI Grok Build)**:
    - Target Binary: `grok`
    - Sandboxing: Tool allowlisting (`--tools read_file,list_dir,grep` with explicit denial of mutations)
+   - Prompt: `--prompt-file`
    - Output Schema: Inline JSON schema via `--json-schema`
    - Settings: Enforces `--no-auto-update` and supports reasoning effort
+   - Unverified: success output shape (CLI not logged in during verification)
 
-4. **`agy-connector` (Google Antigravity)**:
+4. **`agy` (Google Antigravity)**:
    - Target Binary: `agy`
-   - Sandboxing: Plan mode (`--mode plan --sandbox`) and directory sandboxing (`--add-dir`)
+   - Sandboxing: Plan mode (`--mode plan --sandbox`) and directory scoping (`--add-dir`); plan-mode read-only enforcement is unverified
+   - Prompt: one `stream-json` message on stdin
    - Output Schema: File-based schema via `--json-schema`
    - Timeouts: Explicit `--print-timeout` propagation
 
-5. **`copilot-connector` (GitHub Copilot)**:
-   - Target Binary: `gh copilot`
-   - Sandboxing: Tool allowlisting with inline schemas
+5. **`copilot` (GitHub Copilot)**:
+   - Target Binary: `copilot` (standalone CLI, not `gh copilot`), `--output-format json`, `-C <dir>`
+   - Sandboxing: Read-only via `--deny-tool=write --deny-tool=shell`
+   - Prompt: stdin
+   - Output Schema: no schema flag; the schema travels in the prompt and the bridge validates the payload
+   - Unverified: success output shape (CLI not logged in during verification)
 
-6. **`qwen-connector` (Qwen Code)**:
-   - Target Binary: `qwen`
-   - Sandboxing: Tool allowlisting (`Read,Glob,Grep`), inline JSON schemas, and local open-weights execution
+6. **`qwen` (Qwen Code)**:
+   - Target Binary: `qwen` (`--output-format json`)
+   - Sandboxing: Read-only via `--approval-mode plan`
+   - Prompt: stdin
+   - Output Schema: Inline JSON schema via `--json-schema`
 
-7. **`opencode-connector` (OpenCode)**:
-   - Target Binary: `opencode`
-   - Sandboxing: Tool allowlisting, inline schemas, and extensible local model orchestration
+7. **`opencode` (OpenCode)**:
+   - Target Binary: `opencode run --format json --dir <dir>`
+   - Sandboxing: Read-only via the `OPENCODE_PERMISSION` environment variable denying edit and bash
+   - Prompt: stdin
+   - Output Schema: no schema flag; the schema travels in the prompt and the bridge validates the payload
 
 ---
 
 ## 3. The /boost Solutions Architecture
-The `/boost` solutions suite accelerates engineering workflows by dividing complex labor among specialized agents:
+The `/boost` solutions suite accelerates engineering workflows by letting you hand bounded work to the agent best suited for it:
 
 1. **Delegation Booster (`run`)**:
    - Claude Code handles semantic architecture, interface seams, and human feedback.
    - OpenAI Codex handles deep reasoning, algorithmic complexity, and mathematical precision under OS sandboxing.
-   - xAI Grok Build handles rapid linting, lightning-fast reviews, and adversarial audits.
-   - Google Antigravity handles plan-mode verification, multi-directory navigation, and structured proofs.
-   - Qwen Code & OpenCode handle local private tasks without cloud exposure.
+   - xAI Grok Build handles rapid linting, fast reviews, and adversarial audits.
+   - Google Antigravity handles plan-mode verification and structured proofs.
+   - Qwen Code & OpenCode handle tasks on locally configured models.
 
 2. **Adversarial Red Team Boost (`adversarial-review`)**:
    - Deliberately attacks code changes with a Red Team perspective.
@@ -66,88 +79,107 @@ The `/boost` solutions suite accelerates engineering workflows by dividing compl
    - Returns schema-validated findings ordered by severity with exact `file` and `line` indicators.
 
 3. **Emergency Rescue Boost (`rescue`)**:
-   - Automates write-mode diagnostics and self-healing for failing tests and broken builds.
-   - Zero Data Loss Guarantee: Takes an atomic `git stash create` snapshot before making any file changes.
-   - Exposes an immutable `rollbackRef` commit SHA (restorable via `git checkout <rollbackRef> -- .` or `git stash apply <rollbackRef>`) to undo mutations instantly if tests do not pass.
+   - Hands write-mode diagnosis and fixing of failing tests and broken builds to a peer agent; requires `--confirm-write`.
+   - Isolation: the agent works in a git worktree on a `polyglot/<job-id>` branch based on the current state (uncommitted tracked changes included). Your working tree is never written by the bridge (a job is flagged `sourceTreeModified` if the agent wrote there anyway).
+   - The result lists `filesChanged` (the exact diff `base..branch`) and the inspect command (`git diff <base> <branch>`). `apply <job-id>` applies the branch to the working tree (all or nothing), `discard <job-id>` deletes it, `review --to <other> --job <job-id>` has another agent review it.
+   - A write job that changes nothing leaves no branch behind. Write mode outside a git repository is refused. `cancel` discards the job's branch.
 
-4. **Live Multi-Agent Supervision Boost (`runs`, `status`)**:
-   - Aggregated cross-connector monitoring of background jobs.
-   - Displays system PIDs, live running durations, invocation models, prompt previews, and real-time log tails.
+4. **Live Multi-Agent Supervision Boost (`runs`, `wait`, `status`)**:
+   - Aggregated cross-provider monitoring of background jobs. The `runs` table columns are `provider | job | status | pid | model | duration | cost | activity | scope | prompt`, with a totals line (jobs per status, total cost). `status` without an id prints the same dashboard.
+   - `wait <job-id>... [--timeout 9m]` blocks until the jobs finish and returns their full results. Recommended flow: launch with `--background`, then `wait`. To ask several agents, launch one background job per provider, then `wait id1 id2`. Results are returned per provider; the bridge does not merge or vote across agents.
    - White-box observability: `events.ndjson` journal, `--verbose` event re-streaming to stderr, and `status <job-id> --follow`.
-
-5. **Concurrency Gate & Benchmarking**:
-   - Governed by `benchmarks/parallel-policy.json`.
-   - Requires paired empirical benchmarking showing zero correctness regressions across $\ge 5$ runs and $\ge 20\%$ efficiency gains before enabling parallel subagents.
 
 ---
 
 ## 4. Complete CLI Command Reference
+All commands: `node plugins/polyglot/bin/agent-bridge.mjs <command>`. Job commands (`run`, `review`, `adversarial-review`, `rescue`, `resume`, `handoff`) take `--to <provider>`.
 
 ### `setup` & `doctor`
 ```bash
-# Validate binary presence, auth tokens, and flag compatibility
-node <connector>/bin/agent-bridge.mjs setup [--format json|markdown]
-node <connector>/bin/agent-bridge.mjs doctor
+# Validate binary presence, auth state, and flag compatibility
+node plugins/polyglot/bin/agent-bridge.mjs setup [--to <provider>] [--format json|markdown]
+node plugins/polyglot/bin/agent-bridge.mjs doctor [--to <provider>]
 ```
 
 ### `run` (Task Delegation)
 ```bash
-# Read-only task execution with real-time streaming
-node <connector>/bin/agent-bridge.mjs run --prompt "<task>" --stream --format markdown
+# Read-only task execution in the background, then wait for the result
+node plugins/polyglot/bin/agent-bridge.mjs run --to codex --prompt "<task>" --background
+node plugins/polyglot/bin/agent-bridge.mjs wait <job-id> --format markdown
 
-# Write mode execution with explicit safety confirmation
-node <connector>/bin/agent-bridge.mjs run --prompt "<task>" --mode write --confirm-write
+# Write mode: explicit confirmation required, result lands on a polyglot/<job-id> branch
+node plugins/polyglot/bin/agent-bridge.mjs run --to claude --prompt "<task>" --mode write --confirm-write --background
 
-# Background execution with isolation in a detached Git worktree
-node <connector>/bin/agent-bridge.mjs run --prompt "<task>" --background --isolate
+# Isolation in a detached Git worktree, with real-time streaming of provider output
+node plugins/polyglot/bin/agent-bridge.mjs run --to grok --prompt "<task>" --isolate --stream
 ```
 
 ### `review` & `adversarial-review`
 ```bash
 # Review uncommitted changes
-node <connector>/bin/agent-bridge.mjs review --scope uncommitted --stream --format markdown
+node plugins/polyglot/bin/agent-bridge.mjs review --to codex --scope uncommitted --background
 
 # Review a branch against main
-node <connector>/bin/agent-bridge.mjs review --scope branch --base main
+node plugins/polyglot/bin/agent-bridge.mjs review --to claude --scope branch --base main --background
 
 # Adversarial Red Team security audit
-node <connector>/bin/agent-bridge.mjs adversarial-review --focus "security, race conditions" --stream
+node plugins/polyglot/bin/agent-bridge.mjs adversarial-review --to grok --focus "security, race conditions" --background
+```
+Scopes: `auto`, `uncommitted`, `staged`, `branch`, `commit`, `workspace`.
+
+### `rescue` (Fix a Failure on an Isolated Branch)
+```bash
+# Have an agent fix failing tests; changes land on polyglot/<job-id>
+node plugins/polyglot/bin/agent-bridge.mjs rescue --to agy --prompt "Fix tests" --error "<stacktrace>" --test "npm test" --confirm-write --background
 ```
 
-### `rescue` (Auto-Healing with Rollback)
+### `wait`, `runs`, `status`, `result`, `cancel`
 ```bash
-# Auto-fix failing tests with Git rollback tracking
-node <connector>/bin/agent-bridge.mjs rescue --prompt "Fix tests" --error "<stacktrace>" --test "npm test" --stream
-```
+# Block until jobs finish (default 9m; exit code 3 means still running)
+node plugins/polyglot/bin/agent-bridge.mjs wait <job-id>... [--timeout 9m] [--format json|markdown]
 
-### `runs`, `status`, `result`, `cancel`
-```bash
-# Unified multi-agent runs dashboard
-node <connector>/bin/agent-bridge.mjs runs [--all] [--format markdown|json]
+# Unified multi-provider runs dashboard (current repository, --all for every repository)
+node plugins/polyglot/bin/agent-bridge.mjs runs [--all] [--reap] [--format markdown|json]
 
 # Detailed status, duration, PID and log tails
-node <connector>/bin/agent-bridge.mjs status [job-id] [--tail 20] [--follow]
+node plugins/polyglot/bin/agent-bridge.mjs status [job-id] [--tail 20] [--follow]
 
 # Fetch terminal JSON/Markdown result
-node <connector>/bin/agent-bridge.mjs result <job-id> --format markdown
+node plugins/polyglot/bin/agent-bridge.mjs result <job-id> --format markdown
 
-# Terminate running process tree
-node <connector>/bin/agent-bridge.mjs cancel <job-id>
+# Terminate running process tree (a write job's branch is discarded)
+node plugins/polyglot/bin/agent-bridge.mjs cancel <job-id>
 ```
 
 ### `handoff` & `resume`
 ```bash
-# Transfer context between hosts (e.g. from Claude Code to Codex)
-node <connector>/bin/agent-bridge.mjs handoff --from-host claude --prompt "Continue parser optimization"
+# Transfer a derived context digest between hosts (e.g. from Claude Code to Codex)
+node plugins/polyglot/bin/agent-bridge.mjs handoff --to codex --from-host claude --prompt "Continue parser optimization" --background
 
 # Resume native session
-node <connector>/bin/agent-bridge.mjs resume --session "<session-id>" --prompt "<follow-up>"
+node plugins/polyglot/bin/agent-bridge.mjs resume --to codex --session "<session-id>" --prompt "<follow-up>" --background
 ```
+`--from-host` accepts `claude`, `codex`, `grok`, `agy`. A handoff is a derived digest of the conversation, never a lossless session resume. The SessionStart hook records the transcript path per working directory (`~/.agent-connectors/sessions/`), so `--source` is only needed when that failed.
+
+### Exit Codes
+- `0`: COMPLETED
+- `2`: finished but not completed
+- `3`: still running (`wait` timed out; call it again with the same ids)
+- `1`: bridge error
+
+### Installation
+```bash
+# Dry run by default; --apply executes. Hosts: claude|codex|grok|agy|qwen|opencode|copilot|all
+node scripts/install.mjs --host all
+node scripts/install.mjs --host claude --apply
+```
+On Claude Code the installer first uninstalls the old `*-connector` plugins.
 
 ---
 
 ## 5. Security & Isolation Specification
-- **Zero Credential Exposure**: Connectors inherit local CLI sessions. Tokens are never transmitted, inspected, or persisted.
+- **Zero Credential Exposure**: The bridge inherits local CLI sessions. Tokens are never transmitted, inspected, or persisted by the bridge.
+- **Read-Only Enforcement by Provider**: Codex OS sandbox, Claude and Grok tool allowlist, Antigravity plan mode (unverified), Copilot deny-tool, Qwen plan approval mode, OpenCode permission env.
 - **Cycle & Recursion Guard**: Tracks execution hops in `AGENT_CONNECTOR_CHAIN`. Refuses cycles and caps delegation chains at depth 3.
 - **Fail-Closed Verification Contract**:
   - `COMPLETED`: Schema-valid payload, non-`could-not-review` verdict.
@@ -156,7 +188,9 @@ node <connector>/bin/agent-bridge.mjs resume --session "<session-id>" --prompt "
   - `SCHEMA_VIOLATION`: Malformed payload; rejected.
   - `COMPLETED_WITH_DENIALS`: Provider permissions blocked; marked `completed: false`.
   - `SEMANTIC_MISMATCH`: `--expect-response` failed to match output.
-- **Git Rollback Snapshot**: Every write mutation triggers `git stash create` beforehand, recording the exact commit SHA for zero-loss recovery.
+  - `TIMEOUT`, `FAILED`, `CANCELED`, `STALE`: terminal failures.
+- **Isolated Write Branch**: Every write mutation (`run --mode write`, `rescue`) needs `--confirm-write` and runs in a git worktree on a `polyglot/<job-id>` branch. The working tree is never written by the bridge (a job is flagged `sourceTreeModified` if the agent wrote there anyway); the user inspects, applies or discards the branch.
+- **State Location**: Job state lives in `~/.agent-connectors/jobs/<job-id>/` (override with `AGENT_CONNECTOR_HOME`), not in the OS temp directory.
 
 ---
 
@@ -167,5 +201,5 @@ node <connector>/bin/agent-bridge.mjs resume --session "<session-id>" --prompt "
   - "solutions /boost"
   - "cross-agent bridge claude code codex grok antigravity"
   - "multi-agent task delegation"
-- **Schema.org Structured Data**: Conforms to `SoftwareApplication`, `HowTo`, and `FAQPage` schemas embedded in `README.md`.
-- **Quality Assurance**: 100% verified test suite (`npm run qa`, 73/73 tests passing).
+- **Schema.org Structured Data**: `SoftwareApplication` JSON-LD in `README.md`; `SoftwareApplication` and `FAQPage` JSON-LD in `docs/index.html`.
+- **Quality Assurance**: `npm run qa` runs the manifest and provider-contract validator and the automated test suite.

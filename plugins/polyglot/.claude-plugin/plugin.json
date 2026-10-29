@@ -1,0 +1,8 @@
+{
+  "name": "polyglot",
+  "version": "0.5.0",
+  "description": "Delegate git-scoped reviews and bounded coding tasks to any local agent CLI (Codex, Claude Code, Grok Build, Antigravity, Copilot, Qwen Code, OpenCode), track every job, and wait for results.",
+  "author": { "name": "Polyglot Connectors contributors" },
+  "license": "MIT",
+  "keywords": ["agent", "delegation", "cross-host", "code-review", "codex", "claude", "grok", "antigravity", "copilot", "qwen", "opencode"]
+}

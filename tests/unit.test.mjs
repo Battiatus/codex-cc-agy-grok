@@ -1,33 +1,40 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
+import test, { after } from "node:test";
 
-import { parseArgs, parseDuration } from "../src/lib/args.mjs";
-import { createCapture, lastJsonObject, parseProviderOutput, stripAnsi } from "../src/lib/parse.mjs";
-import { interpretVerdict, loadSchema, validate } from "../src/lib/schema.mjs";
-import { buildInvocationArgs, composePrompt } from "../src/lib/invocation.mjs";
-import { diffText, resolveScope } from "../src/lib/git.mjs";
-import { isSecretName, prepareExecutionRoot } from "../src/lib/isolation.mjs";
-import { resolveExecutable } from "../src/lib/exec.mjs";
-import { renderResult, renderRunsDashboard } from "../src/lib/render.mjs";
-import { buildHandoffDigest } from "../src/lib/transfer.mjs";
-import { listAllRuns, readJobTails } from "../src/lib/jobs.mjs";
-import { auditFlags, inspectConnector } from "../src/lib/setup.mjs";
+import { parseArgs, parseDuration } from "../plugins/polyglot/bin/lib/args.mjs";
+import { createCapture, createProgressTracker, lastJsonObject, parseProviderOutput, stripAnsi } from "../plugins/polyglot/bin/lib/parse.mjs";
+import { interpretVerdict, loadSchema, validate } from "../plugins/polyglot/bin/lib/schema.mjs";
+import { buildInvocationArgs, composePrompt } from "../plugins/polyglot/bin/lib/invocation.mjs";
+import { diffText, resolveScope } from "../plugins/polyglot/bin/lib/git.mjs";
+import { isSecretName, prepareExecutionRoot } from "../plugins/polyglot/bin/lib/isolation.mjs";
+import { resolveExecutable } from "../plugins/polyglot/bin/lib/exec.mjs";
+import { renderResult, renderRunsDashboard, renderStats } from "../plugins/polyglot/bin/lib/render.mjs";
+import { buildHandoffDigest } from "../plugins/polyglot/bin/lib/transfer.mjs";
+import { jobPaths, listJobs, providerStats, readJobTails, updateJob } from "../plugins/polyglot/bin/lib/jobs.mjs";
+import { auditFlags, inspectConnector } from "../plugins/polyglot/bin/lib/setup.mjs";
+
+const scratchDirectories = [];
 
 async function scratch(name) {
-  return mkdtemp(join(tmpdir(), `polyglot-${name}-`));
+  const directory = await mkdtemp(join(tmpdir(), `polyglot-${name}-`));
+  scratchDirectories.push(directory);
+  return directory;
 }
+
+after(() => Promise.all(scratchDirectories.map((directory) =>
+  rm(directory, { recursive: true, force: true, maxRetries: 3 }).catch(() => {}))));
 
 function git(cwd, args) {
   return spawnSync("git", args, { cwd, encoding: "utf8", windowsHide: true });
 }
 
-async function connectorConfig(pluginName) {
+async function connectorConfig(id) {
   return JSON.parse(
-    await readFile(new URL(`../plugins/${pluginName}/connector.json`, import.meta.url), "utf8"),
+    await readFile(new URL(`../plugins/polyglot/bin/providers/${id}.json`, import.meta.url), "utf8"),
   );
 }
 
@@ -206,7 +213,7 @@ test("provider text quoting a denial phrase is not treated as a denial", () => {
 });
 
 test("argument groups are all-or-nothing so a missing value never shifts the command line", async () => {
-  const config = await connectorConfig("codex-connector");
+  const config = await connectorConfig("codex");
   const withoutModel = buildInvocationArgs(config, {
     executionCwd: "/w",
     prompt: "p",
@@ -224,7 +231,9 @@ test("argument groups are all-or-nothing so a missing value never shifts the com
   assert.deepEqual(withoutModel.args.slice(0, 7), [
     "exec", "--json", "--skip-git-repo-check", "-C", "/w", "--sandbox", "read-only",
   ]);
-  assert.equal(withoutModel.args.at(-1), "p");
+  // The prompt travels on stdin; "-" tells codex exec to read it.
+  assert.equal(withoutModel.args.at(-1), "-");
+  assert.ok(!withoutModel.args.includes("p"));
 
   const full = buildInvocationArgs(config, {
     executionCwd: "/w",
@@ -245,7 +254,7 @@ test("argument groups are all-or-nothing so a missing value never shifts the com
 });
 
 test("codex review-mode resume carries the sandbox through -c", async () => {
-  const config = await connectorConfig("codex-connector");
+  const config = await connectorConfig("codex");
   const resumed = buildInvocationArgs(config, {
     executionCwd: "/w",
     prompt: "follow up",
@@ -263,7 +272,7 @@ test("codex review-mode resume carries the sandbox through -c", async () => {
 });
 
 test("grok review mode denies the write and shell tools by their real names", async () => {
-  const config = await connectorConfig("grok-connector");
+  const config = await connectorConfig("grok");
   const review = buildInvocationArgs(config, {
     executionCwd: "/w",
     prompt: "p",
@@ -444,20 +453,20 @@ test("shim resolution skips the node.exe interpreter and returns the real entryp
 // R2: the orchestration journal is append-only NDJSON, in order, resumable.
 test("event journal appends NDJSON lines and reads them back in order", async () => {
   const dir = await mkdtemp(join(tmpdir(), "polyglot-events-"));
-  const { appendEvent, readEvents, jobPaths } = await import("../src/lib/jobs.mjs");
-  await appendEvent("codex", "job-1", "job-started", { mode: "review" }, dir);
-  await appendEvent("codex", "job-1", "child-spawned", { pid: 123 }, dir);
-  await appendEvent("codex", "job-1", "finished", { status: "COMPLETED" }, dir);
+  const { appendEvent, readEvents } = await import("../plugins/polyglot/bin/lib/jobs.mjs");
+  await appendEvent("job-1", "job-started", { mode: "review" }, dir);
+  await appendEvent("job-1", "child-spawned", { pid: 123 }, dir);
+  await appendEvent("job-1", "finished", { status: "COMPLETED" }, dir);
 
-  const { events, offset } = await readEvents("codex", "job-1", {}, dir);
+  const { events, offset } = await readEvents("job-1", {}, dir);
   assert.deepEqual(events.map((event) => event.kind), ["job-started", "child-spawned", "finished"]);
   assert.equal(events[1].pid, 123);
   assert.ok(events.every((event) => event.ts && event.jobId === "job-1"));
 
   // Incremental read: from the previous offset, nothing new; then one more.
-  assert.deepEqual((await readEvents("codex", "job-1", { offset }, dir)).events, []);
-  await appendEvent("codex", "job-1", "cleanup-done", { failed: false }, dir);
-  const follow = await readEvents("codex", "job-1", { offset }, dir);
+  assert.deepEqual((await readEvents("job-1", { offset }, dir)).events, []);
+  await appendEvent("job-1", "cleanup-done", { failed: false }, dir);
+  const follow = await readEvents("job-1", { offset }, dir);
   assert.deepEqual(follow.events.map((event) => event.kind), ["cleanup-done"]);
 });
 
@@ -528,7 +537,7 @@ test("a handoff refuses a transcript outside the host directory", async () => {
   );
 });
 
-test("listAllRuns aggregates and sorts jobs across multiple connector state directories", async () => {
+test("listJobs aggregates and sorts jobs across providers", async () => {
   const home = await scratch("runs-state");
   const connectors = ["codex", "claude", "grok", "agy", "copilot"];
   
@@ -536,7 +545,7 @@ test("listAllRuns aggregates and sorts jobs across multiple connector state dire
   for (let i = 0; i < connectors.length; i++) {
     const connector = connectors[i];
     const jobId = `${connector}-job-${i}`;
-    const jobDir = join(home, connector, "jobs", jobId);
+    const jobDir = join(home, "jobs", jobId);
     await mkdir(jobDir, { recursive: true });
     await writeFile(
       join(jobDir, "job.json"),
@@ -563,7 +572,7 @@ test("listAllRuns aggregates and sorts jobs across multiple connector state dire
   }
 
   // 1. Unscoped (all: true) - returns all 5 jobs sorted by createdAt desc
-  const allRuns = await listAllRuns({ all: true, stateHome: home });
+  const allRuns = await listJobs({ all: true, stateHome: home });
   assert.equal(allRuns.length, 5);
   assert.equal(allRuns[0].connector, "copilot"); // newest
   assert.equal(allRuns[4].connector, "codex");   // oldest
@@ -575,19 +584,19 @@ test("listAllRuns aggregates and sorts jobs across multiple connector state dire
   assert.ok(runningJob.liveDurationMs > 0);
 
   // 2. Scoped by repositoryRoot
-  const scopedRuns = await listAllRuns({ repositoryRoot: "/repo/alpha", all: false, stateHome: home });
+  const scopedRuns = await listJobs({ repositoryRoot: "/repo/alpha", all: false, stateHome: home });
   assert.equal(scopedRuns.length, 3);
   assert.ok(scopedRuns.every((j) => j.repositoryRoot === "/repo/alpha"));
 
   // 3. Non-existent state directory returns empty array
-  const emptyRuns = await listAllRuns({ stateHome: join(home, "non-existent") });
+  const emptyRuns = await listJobs({ stateHome: join(home, "non-existent") });
   assert.deepEqual(emptyRuns, []);
 });
 
 test("readJobTails extracts bounded lines from stdout and stderr logs", async () => {
   const home = await scratch("tails-state");
   const jobId = "tail-test-job-1";
-  const jobDir = join(home, "codex", "jobs", jobId);
+  const jobDir = join(home, "jobs", jobId);
   await mkdir(jobDir, { recursive: true });
 
   // Generate 25 lines of stdout and 20 lines of stderr
@@ -597,14 +606,14 @@ test("readJobTails extracts bounded lines from stdout and stderr logs", async ()
   await writeFile(join(jobDir, "provider.stdout.ndjson"), stdoutLines, "utf8");
   await writeFile(join(jobDir, "provider.stderr.log"), stderrLines, "utf8");
 
-  const tails = await readJobTails("codex", jobId, { lines: 5, stateHome: home });
+  const tails = await readJobTails(jobId, { lines: 5, stateHome: home });
   assert.equal(tails.stdoutTail.split("\n").filter(Boolean).length, 5);
   assert.equal(tails.stderrTail.split("\n").filter(Boolean).length, 5);
   assert.ok(tails.stdoutTail.includes('"index":25'));
   assert.ok(tails.stderrTail.includes("[LOG 20]"));
 
   // Missing files return empty strings
-  const missingTails = await readJobTails("codex", "non-existent-job", { stateHome: home });
+  const missingTails = await readJobTails("non-existent-job", { stateHome: home });
   assert.equal(missingTails.stdoutTail, "");
   assert.equal(missingTails.stderrTail, "");
 });
@@ -636,7 +645,7 @@ test("renderRunsDashboard formats a valid Markdown table and sanitizes prompt pr
   ];
 
   const markdown = renderRunsDashboard(jobs);
-  assert.ok(markdown.includes("| connector | job | status | pid | model | duration | stream | scope | prompt |"));
+  assert.ok(markdown.includes("| provider | job | status | pid | model | duration | cost | activity | scope | prompt |"));
   assert.ok(markdown.includes("| --- | --- | --- | --- | --- | --- | --- | --- |"));
   assert.ok(markdown.includes("| codex | `codex-12345` | RUNNING | 1234 | gpt-5.4-mini |"));
   assert.ok(markdown.includes("| claude | `claude-67890` | COMPLETED | — | claude-sonnet-5 |"));
@@ -644,7 +653,7 @@ test("renderRunsDashboard formats a valid Markdown table and sanitizes prompt pr
   assert.ok(!markdown.includes("\nand check edge cases"));
   
   // Empty state rendering
-  assert.equal(renderRunsDashboard([]), "No runs recorded across connectors.");
+  assert.equal(renderRunsDashboard([]), "No runs recorded.");
 });
 
 test("stripAnsi removes ANSI escape color sequences and formatting", () => {
@@ -909,3 +918,182 @@ Options:
   assert.ok(!mismatchAudit.missing.includes("--hidden-beta-flag"));
 });
 
+
+test("a terminal status is sticky and concurrent updates never lose a write", async () => {
+  const home = await scratch("sticky-state");
+  const jobId = "codex-sticky-1";
+  await mkdir(jobPaths(jobId, home).directory, { recursive: true });
+  await updateJob(jobId, { status: "RUNNING", completed: false }, home);
+  // Fire-and-forget heartbeats racing the final write, as the worker does.
+  const heartbeats = Array.from({ length: 20 }, (_, index) => updateJob(jobId, { stdoutBytes: index }, home));
+  await updateJob(jobId, { status: "COMPLETED", completed: true }, home);
+  await Promise.all(heartbeats);
+  const late = await updateJob(jobId, { status: "RUNNING", stdoutBytes: 99 }, home);
+  assert.equal(late.status, "COMPLETED");
+  assert.equal(late.completed, true);
+  assert.equal(late.stdoutBytes, 99);
+});
+
+test("job ids cannot escape the state directory", () => {
+  assert.throws(() => jobPaths("../../etc"), /Invalid job id/);
+  assert.throws(() => jobPaths(""), /Invalid job id/);
+});
+
+test("the runs dashboard totals statuses and cost", () => {
+  const markdown = renderRunsDashboard([
+    { connector: "codex", jobId: "a", status: "COMPLETED", costUsd: 0.5 },
+    { connector: "claude", jobId: "b", status: "COMPLETED", costUsd: 0.25 },
+    { connector: "grok", jobId: "c", status: "FAILED" },
+  ]);
+  assert.match(markdown, /\*\*3 jobs\*\* — COMPLETED 2 · FAILED 1 · \$0\.7500/);
+  assert.match(markdown, /\| \$0\.5000 \|/);
+});
+
+test("live progress follows each provider's streamed tool calls, tokens and cost", () => {
+  const root = "C:\\work\\repo";
+  const feed = (tracker, events) => tracker.push(Buffer.from(events.map((event) => `${JSON.stringify(event)}\n`).join("")));
+
+  const codex = createProgressTracker({ root });
+  feed(codex, [
+    { type: "item.started", item: { type: "command_execution", command: "npm test" } },
+    { type: "item.completed", item: { type: "file_change", changes: [{ path: `${root}\\src\\a.js` }] } },
+    { type: "turn.completed", usage: { output_tokens: 40 } },
+  ]);
+  assert.deepEqual(codex.snapshot().recent, ["$ npm test", "edit src\\a.js"]);
+  assert.equal(codex.snapshot().outputTokens, 40);
+
+  // Claude's per-message usage is a placeholder: only the result counts.
+  const claude = createProgressTracker({ root: "C:/work/repo" });
+  feed(claude, [
+    { type: "assistant", message: { id: "m1", content: [{ type: "tool_use", name: "Read", input: { file_path: "C:/work/repo/math.js" } }], usage: { output_tokens: 2 } } },
+    { type: "assistant", message: { id: "m1", content: [{ type: "text", text: "ok" }], usage: { output_tokens: 2 } } },
+    { type: "assistant", message: { id: "m2", content: [
+      { type: "tool_use", name: "Grep", input: { pattern: "add", path: "C:/work/repo" } },
+      { type: "tool_use", name: "Bash", input: { command: "git status" } },
+    ] } },
+  ]);
+  assert.equal(claude.snapshot().outputTokens, null);
+  feed(claude, [{ type: "result", total_cost_usd: 0.25, usage: { output_tokens: 2172 } }]);
+  assert.equal(claude.snapshot().lastAction, "Bash git status");
+  assert.equal(claude.snapshot().actions, 3, "each tool call is one action");
+  assert.deepEqual(claude.snapshot().recent, ["Read math.js", "Grep add", "Bash git status"]);
+  assert.equal(claude.snapshot().outputTokens, 2172);
+  assert.equal(claude.snapshot().costUsd, 0.25);
+
+  const qwen = createProgressTracker({ root });
+  feed(qwen, [
+    { type: "assistant", message: { content: [{ type: "tool_use", name: "grep_search", input: { path: root } }] } },
+    { type: "assistant", message: { content: [{ type: "tool_use", name: "read_file", input: { path: `${root}-old\\x.js` } }] } },
+  ]);
+  assert.deepEqual(qwen.snapshot().recent, ["grep_search .", `read_file ${root}-old\\x.js`], "the root reads as ., a sibling stays whole");
+
+  const opencode = createProgressTracker();
+  feed(opencode, [
+    { type: "tool_use", part: { tool: "grep", state: { input: { pattern: "TODO" } } } },
+    { type: "step_finish", part: { cost: 0.01, tokens: { output: 7 } } },
+    { type: "step_finish", part: { cost: 0.02, tokens: { output: 3 } } },
+  ]);
+  assert.equal(opencode.snapshot().lastAction, "grep TODO");
+  assert.equal(opencode.snapshot().outputTokens, 10);
+  assert.ok(Math.abs(opencode.snapshot().costUsd - 0.03) < 1e-9);
+
+  const agy = createProgressTracker({ root });
+  feed(agy, [
+    { event: "step_update", step_update: { step_type: "tool", state: "ACTIVE", tool_name: "read_file", tool_info: { parameters: { Path: `${root}\\math.js` } } } },
+    { event: "step_update", step_update: { step_type: "agent_response", state: "DONE", usage: { output_tokens: 99 } } },
+  ]);
+  assert.equal(agy.snapshot().lastAction, "read_file math.js");
+  assert.equal(agy.snapshot().outputTokens, 99);
+});
+
+test("live progress survives events split across chunks and keeps only the last actions", () => {
+  const tracker = createProgressTracker();
+  assert.equal(tracker.snapshot(), null, "nothing to report before the first event");
+  const line = `${JSON.stringify({ type: "tool_use", part: { tool: "read", state: { input: { filePath: "été.js" } } } })}\n`;
+  const bytes = Buffer.from(line);
+  const cut = bytes.indexOf(Buffer.from("é")) + 1;
+  assert.equal(tracker.push(bytes.subarray(0, cut)), false, "half an event is not progress");
+  assert.equal(tracker.push(bytes.subarray(cut)), true);
+  assert.equal(tracker.snapshot().lastAction, "read été.js");
+  for (let index = 0; index < 8; index += 1) {
+    tracker.push(Buffer.from(`${JSON.stringify({ type: "tool_use", part: { tool: `t${index}` } })}\nnot json\n`));
+  }
+  assert.equal(tracker.snapshot().actions, 9);
+  assert.deepEqual(tracker.snapshot().recent, ["t3", "t4", "t5", "t6", "t7"]);
+});
+
+test("stream-json output is parsed from its result event, not from fenced JSON in assistant text", () => {
+  const stdout = [
+    { type: "system", subtype: "init", session_id: "s-1" },
+    { type: "assistant", message: { content: [{ type: "text", text: "```json\n{\"verdict\":\"approve\"}\n```" }] } },
+    { type: "result", subtype: "success", session_id: "s-1", result: "{\"verdict\":\"needs-attention\"}", total_cost_usd: 0.1 },
+  ].map((event) => JSON.stringify(event)).join("\n");
+  for (const adapter of ["claude", "qwen"]) {
+    const parsed = parseProviderOutput(adapter, { stdout });
+    assert.equal(parsed.structured.verdict, "needs-attention", adapter);
+    assert.equal(parsed.nativeSessionId, "s-1");
+  }
+  const unfinished = parseProviderOutput("claude", { stdout: stdout.split("\n").slice(0, 2).join("\n") });
+  assert.equal(unfinished.providerError, "provider output was not parseable", "a stream with no result event did not finish");
+});
+
+test("job listing skips stray entries and, with since, jobs created before it", async () => {
+  const home = await scratch("list-since");
+  const old = `codex-${(Date.now() - 72 * 3_600_000).toString(36)}-aaaa`;
+  const recent = `codex-${Date.now().toString(36)}-bbbb`;
+  for (const jobId of [old, recent]) {
+    await mkdir(jobPaths(jobId, home).directory, { recursive: true });
+    await writeFile(jobPaths(jobId, home).job, JSON.stringify({ jobId, status: "COMPLETED", createdAt: new Date().toISOString() }), "utf8");
+  }
+  await writeFile(join(home, "jobs", ".DS_Store"), "", "utf8");
+  assert.deepEqual((await listJobs({ all: true, stateHome: home })).map((job) => job.jobId).sort(), [old, recent].sort());
+  const since = Date.now() - 48 * 3_600_000;
+  assert.deepEqual((await listJobs({ all: true, since, stateHome: home })).map((job) => job.jobId), [recent]);
+});
+
+test("provider stats rank by recent completions and name the usual failure", () => {
+  const at = (minutes) => new Date(Date.UTC(2026, 0, 1, 0, minutes)).toISOString();
+  const jobs = [
+    { connector: "codex", status: "FAILED", completed: false, createdAt: at(1) },
+    { connector: "codex", status: "FAILED", completed: false, createdAt: at(2) },
+    { connector: "codex", status: "COMPLETED", completed: true, durationMs: 4_000, createdAt: at(3), costUsd: 0.5 },
+    { connector: "codex", status: "TIMEOUT", completed: false, createdAt: at(4) },
+    { connector: "codex", status: "RUNNING", completed: false, createdAt: at(5) },
+    { connector: "codex", status: "CANCELED", completed: false, createdAt: at(6) },
+    { connector: "codex", status: "EMPTY_SCOPE", completed: false, createdAt: at(7) },
+    { connector: "grok", status: "COMPLETED", completed: true, durationMs: 1_000, createdAt: at(1) },
+    { connector: "grok", status: "COMPLETED", completed: true, durationMs: 3_000, createdAt: at(2) },
+  ];
+  const [codex, grok] = providerStats(jobs);
+  assert.deepEqual(
+    { jobs: codex.jobs, completed: codex.completed, topFailure: codex.topFailure, costUsd: codex.costUsd },
+    { jobs: 4, completed: 1, topFailure: { status: "FAILED", count: 2 }, costUsd: 0.5 },
+    "running, canceled and empty-scope jobs are not a track record",
+  );
+  assert.equal(grok.successRate, 1);
+  assert.equal(grok.medianDurationMs, 2_000);
+  const [recentCodex] = providerStats(jobs, { recent: 2 });
+  assert.equal(recentCodex.jobs, 2, "only the newest jobs count when routing");
+  assert.equal(recentCodex.topFailure.status, "TIMEOUT");
+  assert.match(renderStats(providerStats(jobs)), /\| codex \| 4 \| 1 \| 25% \| 4\.0s \| \$0\.5000 \| FAILED ×2 \|/);
+});
+
+test("a running job shows what the agent is doing now", () => {
+  const markdown = renderResult({
+    connector: "agy",
+    jobId: "agy-1",
+    status: "RUNNING",
+    mode: "review",
+    progress: {
+      lastAction: "read_file math.js",
+      lastActionAt: new Date().toISOString(),
+      actions: 3,
+      recent: ["grep add", "list_dir .", "read_file math.js"],
+      outputTokens: 120,
+      costUsd: null,
+    },
+  });
+  assert.match(markdown, /\*\*Now:\*\* `read_file math\.js` \(3 actions, \d+s ago\)/);
+  assert.match(markdown, /- `grep add`\n- `list_dir \.`/);
+  assert.match(markdown, /So far: 120 output tokens/);
+});

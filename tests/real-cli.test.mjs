@@ -28,12 +28,10 @@ function skipTest(t, msg) {
   }
 }
 
-function bridgeFor(connector) {
-  return join(repositoryRoot, "plugins", `${connector}-connector`, "bin", "agent-bridge.mjs");
-}
+const bridge = join(repositoryRoot, "plugins", "polyglot", "bin", "agent-bridge.mjs");
 
-function runBridge(connector, args, timeoutMs = 120_000) {
-  const result = spawnSync(process.execPath, [bridgeFor(connector), ...args], {
+function runBridge(connector, [command, ...rest], timeoutMs = 120_000) {
+  const result = spawnSync(process.execPath, [bridge, command, "--to", connector, ...rest], {
     cwd: repositoryRoot,
     encoding: "utf8",
     windowsHide: true,
@@ -47,6 +45,11 @@ function runBridge(connector, args, timeoutMs = 120_000) {
     parsed = null;
   }
   return { ...result, parsed };
+}
+
+// doctor reports one entry per provider; with --to there is exactly one.
+function doctor(connector, timeoutMs) {
+  return runBridge(connector, ["doctor"], timeoutMs).parsed?.providers?.[0] ?? null;
 }
 
 async function temporaryRepository() {
@@ -69,7 +72,7 @@ async function repositoryWithPlantedDefect() {
 
 for (const connector of selected) {
   test(`${connector}: the installed CLI is ready and every declared flag exists`, { skip: !enabled }, (t) => {
-    const { parsed } = runBridge(connector, ["doctor"], 90_000);
+    const parsed = doctor(connector, 90_000);
     assert.ok(parsed, "doctor must return JSON");
 
     if (!parsed.installed) {
@@ -95,13 +98,13 @@ for (const connector of selected) {
     skip: !enabled,
     timeout: REVIEW_TIMEOUT_MS + 60_000,
   }, async (t) => {
-    const doctor = runBridge(connector, ["doctor"], 90_000);
-    if (!doctor.parsed?.installed) {
-      skipTest(t, `${connector}: CLI not installed: ${doctor.parsed?.remediation || doctor.parsed?.error || "installation required"}`);
+    const report = doctor(connector, 90_000);
+    if (!report?.installed) {
+      skipTest(t, `${connector}: CLI not installed: ${report?.remediation || report?.error || "installation required"}`);
       return;
     }
-    if (doctor.parsed?.authenticated !== true) {
-      skipTest(t, `${connector}: CLI not authenticated: ${doctor.parsed?.remediation || doctor.parsed?.authDetail || "login required"}`);
+    if (report?.authenticated !== true) {
+      skipTest(t, `${connector}: CLI not authenticated: ${report?.remediation || report?.authDetail || "login required"}`);
       return;
     }
 
@@ -141,7 +144,7 @@ const VENDOR_VALIDATORS = [
 ];
 
 for (const { binary, args, expect } of VENDOR_VALIDATORS) {
-  test(`${binary} accepts every generated plugin manifest`, { skip: !enabled, timeout: 300_000 }, (t) => {
+  test(`${binary} accepts the polyglot plugin manifest`, { skip: !enabled, timeout: 300_000 }, (t) => {
     const probe = spawnSync(binary, ["--version"], {
       encoding: "utf8",
       windowsHide: true,
@@ -152,20 +155,15 @@ for (const { binary, args, expect } of VENDOR_VALIDATORS) {
       return;
     }
 
-    for (const connector of ["codex", "grok", "agy", "claude"]) {
-      const pluginPath = join(repositoryRoot, "plugins", `${connector}-connector`);
-      const validateProbe = spawnSync(binary, args(pluginPath), {
-        encoding: "utf8",
-        windowsHide: true,
-        timeout: 90_000,
-      });
-      const output = `${validateProbe.stdout || ""}\n${validateProbe.stderr || ""}`;
-      assert.match(output, expect, `${binary} rejected ${connector}-connector:\n${output}`);
-      assert.ok(
-        !/Validation failed|✘/.test(output),
-        `${binary} reported a failure for ${connector}-connector:\n${output}`,
-      );
-    }
+    const pluginPath = join(repositoryRoot, "plugins", "polyglot");
+    const validateProbe = spawnSync(binary, args(pluginPath), {
+      encoding: "utf8",
+      windowsHide: true,
+      timeout: 90_000,
+    });
+    const output = `${validateProbe.stdout || ""}\n${validateProbe.stderr || ""}`;
+    assert.match(output, expect, `${binary} rejected polyglot:\n${output}`);
+    assert.ok(!/Validation failed|✘/.test(output), `${binary} reported a failure for polyglot:\n${output}`);
   });
 }
 
@@ -175,8 +173,8 @@ test("a clean tree is reported as an empty scope by a real CLI", {
 }, async (t) => {
   let activeConnector = null;
   for (const candidate of selected) {
-    const doc = runBridge(candidate, ["doctor"], 30_000);
-    if (doc.parsed?.installed && doc.parsed?.authenticated === true) {
+    const doc = doctor(candidate, 30_000);
+    if (doc?.installed && doc?.authenticated === true) {
       activeConnector = candidate;
       break;
     }

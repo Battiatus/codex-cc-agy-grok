@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 2,
+  "id": "qwen",
+  "displayName": "Qwen Code Connector",
+  "binary": "qwen",
+  "resultAdapter": "qwen",
+  "versionArgs": [
+    "--version"
+  ],
+  "helpProbes": [
+    [
+      "--help"
+    ]
+  ],
+  "knownHiddenFlags": [],
+  "authProbe": null,
+  "installHint": "Install Qwen Code CLI",
+  "effortValues": [
+    "low",
+    "medium",
+    "high"
+  ],
+  "capabilities": {
+    "structuredOutput": "prompt",
+    "model": true,
+    "effort": false,
+    "resume": true,
+    "budgetUsd": false,
+    "finalMessageFile": false,
+    "readOnlyEnforcement": "plan-mode"
+  },
+  "invocation": {
+    "promptVia": "stdin",
+    "baseArgs": [
+      "--output-format",
+      "json"
+    ],
+    "reviewArgs": [
+      "--approval-mode",
+      "plan"
+    ],
+    "writeArgs": [
+      "--approval-mode",
+      "auto-edit"
+    ],
+    "resumeExtraArgs": [
+      "--resume",
+      "{session}"
+    ],
+    "modelArgs": [
+      "--model",
+      "{model}"
+    ],
+    "effortArgs": [],
+    "schemaArgs": [],
+    "finalMessageArgs": [],
+    "budgetArgs": [],
+    "promptArgs": []
+  }
+}

@@ -1,9 +1,9 @@
 {
   "name": "polyglot-agent-connectors",
-  "version": "0.3.0",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
-  "description": "Passerelle multi-agents & solutions /boost (Cross-Agent Bridge) connectant Claude Code, OpenAI Codex, xAI Grok Build, Google Antigravity, GitHub Copilot, Qwen Code et OpenCode. Déléguez des tâches entre agents, exécutez des revues Red Team contradictoires, réparez avec rollback Git et supervisez en temps réel.",
+  "description": "Passerelle multi-agents & solutions /boost (Cross-Agent Bridge) connectant Claude Code, OpenAI Codex, xAI Grok Build, Google Antigravity, GitHub Copilot, Qwen Code et OpenCode. Déléguez des tâches entre agents, exécutez des revues Red Team contradictoires, réparez sur une branche Git isolée et supervisez en temps réel.",
   "keywords": [
     "claude-code",
     "codex",
@@ -33,7 +33,7 @@
     "adversarial-review",
     "red-team-review",
     "autonomous-rescue",
-    "git-rollback",
+    "git-worktree",
     "ai-orchestration",
     "llms-txt",
     "geo-optimization",
@@ -53,11 +53,9 @@
     "node": ">=18.18.0"
   },
   "scripts": {
-    "build": "node scripts/build-plugins.mjs",
     "validate": "node scripts/validate-cross-host.mjs",
-    "test": "node --test tests/unit.test.mjs tests/bridge.test.mjs tests/benchmark-parallelism.test.mjs",
+    "test": "node --test tests/unit.test.mjs tests/bridge.test.mjs",
     "test:real": "node --test tests/real-cli.test.mjs",
-    "benchmark:parallel": "node scripts/benchmark-parallelism.mjs",
     "qa": "npm run validate && npm test"
   }
 }

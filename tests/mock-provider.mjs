@@ -1,4 +1,6 @@
+import { spawnSync } from "node:child_process";
 import { writeFile } from "node:fs/promises";
+import { join } from "node:path";
 
 // Emits the real wire format of each provider, captured from live CLI runs, so
 // the adapter tests exercise the shapes the bridge actually has to parse.
@@ -20,11 +22,46 @@ if (args.includes("status") || args.includes("models")) {
   process.exit(0);
 }
 
+if (process.env.MOCK_STDIN_PATH) {
+  const chunks = [];
+  for await (const chunk of process.stdin) chunks.push(chunk);
+  await writeFile(process.env.MOCK_STDIN_PATH, Buffer.concat(chunks).toString("utf8"), "utf8");
+}
+
+const streamJson = args.includes("stream-json");
+const target = join(process.cwd(), "math.js");
+// The first tool call, in each provider's streamed shape, so live progress has
+// something to show while MOCK_DELAY_MS holds the job open.
+const PROGRESS = {
+  codex: { type: "item.started", item: { id: "c1", type: "command_execution", command: "npm test" } },
+  claude: { type: "assistant", message: { id: "m1", content: [{ type: "tool_use", name: "Read", input: { file_path: target } }], usage: { output_tokens: 12 } } },
+  qwen: { type: "assistant", message: { id: "m1", content: [{ type: "tool_use", name: "read_file", input: { path: target } }], usage: { output_tokens: 12 } } },
+  opencode: { type: "tool_use", sessionID: "opencode-session-1", part: { tool: "read", state: { input: { filePath: target } } } },
+  agy: { event: "step_update", step_update: { step_type: "tool", state: "ACTIVE", tool_name: "read_file", tool_info: { parameters: { Path: target } } } },
+};
+if (PROGRESS[connector] && (streamJson || !["claude", "qwen"].includes(connector))) {
+  process.stdout.write(`${JSON.stringify(PROGRESS[connector])}\n`);
+}
+
 const delay = Number(process.env.MOCK_DELAY_MS || 0);
 if (delay > 0) await new Promise((done) => setTimeout(done, delay));
 
 if (process.env.MOCK_WRITE === "1") {
   await writeFile("mutated-by-provider.txt", connector, "utf8");
+}
+// Latin-1 text: valid for git, invalid as UTF-8. No newline, so autocrlf
+// leaves the bytes alone.
+if (process.env.MOCK_WRITE_LATIN1 === "1") {
+  await writeFile("latin1.txt", Buffer.from([0x63, 0x61, 0x66, 0xe9]));
+}
+// A provider that ignores its workspace root and writes the user's tree.
+if (process.env.MOCK_WRITE_SOURCE) {
+  await writeFile(process.env.MOCK_WRITE_SOURCE, "rogue", "utf8");
+}
+// Leaves the worktree's index locked so the bridge's commit fails.
+if (process.env.MOCK_LOCK_INDEX === "1") {
+  const gitDir = spawnSync("git", ["rev-parse", "--absolute-git-dir"], { encoding: "utf8" }).stdout.trim();
+  await writeFile(join(gitDir, "index.lock"), "", "utf8");
 }
 if (process.env.MOCK_ECHO_CHAIN === "1") {
   process.stderr.write(`CHAIN=${process.env.AGENT_CONNECTOR_CHAIN || ""}\n`);
@@ -109,6 +146,13 @@ if (connector === "codex") {
   const outputPath = flag("-o");
   if (outputPath) await writeFile(outputPath, finalText(), "utf8");
 } else if (connector === "claude") {
+  if (streamJson) {
+    process.stdout.write(`${JSON.stringify({ type: "system", subtype: "init", session_id: "claude-session-1" })}\n`);
+    process.stdout.write(`${JSON.stringify({
+      type: "assistant",
+      message: { id: "m2", content: [{ type: "text", text: "Draft:\n```json\n{\"verdict\":\"approve\"}\n```" }], usage: { output_tokens: 30 } },
+    })}\n`);
+  }
   process.stdout.write(`${JSON.stringify({
     type: "result",
     subtype: "success",
@@ -131,8 +175,41 @@ if (connector === "codex") {
     total_cost_usd: 0.0456,
     structuredOutput: structured(),
   }, null, 2)}\n`);
+} else if (connector === "qwen") {
+  const events = [
+    { type: "system", subtype: "init", session_id: "qwen-session-1" },
+    // Fenced JSON in assistant text must never be taken for the result.
+    { type: "assistant", message: { id: "m2", content: [{ type: "text", text: "```json\n{\"verdict\":\"approve\"}\n```" }] } },
+    {
+      type: "result",
+      subtype: "success",
+      is_error: false,
+      session_id: "qwen-session-1",
+      num_turns: 1,
+      usage,
+      permission_denials: denials,
+      result: finalText(),
+    },
+  ];
+  // stream-json is one event per line; plain json is one array of them.
+  process.stdout.write(streamJson
+    ? events.map((event) => `${JSON.stringify(event)}\n`).join("")
+    : `${JSON.stringify(events)}\n`);
+} else if (connector === "opencode") {
+  for (const event of [
+    { type: "step_start", sessionID: "opencode-session-1", part: {} },
+    { type: "text", sessionID: "opencode-session-1", part: { text: finalText() } },
+    {
+      type: "step_finish",
+      sessionID: "opencode-session-1",
+      part: { reason: "stop", cost: 0.002, tokens: { total: 1_290, input: 1_234, output: 56, reasoning: 0, cache: { read: 78, write: 0 } } },
+    },
+  ]) process.stdout.write(`${JSON.stringify(event)}\n`);
+} else if (connector === "copilot") {
+  process.stdout.write(`${JSON.stringify({ type: "session.start", sessionId: "copilot-session-1" })}\n`);
+  process.stdout.write(`${JSON.stringify({ type: "assistant.message", data: { content: finalText() } })}\n`);
 } else {
-  process.stdout.write(`${JSON.stringify({
+  const envelope = {
     conversation_id: "agy-session-1",
     status: process.env.MOCK_ABNORMAL_STATUS === "1" ? "ERROR" : "SUCCESS",
     response: finalText(),
@@ -140,7 +217,10 @@ if (connector === "codex") {
     num_turns: 1,
     usage,
     structured_output: structured(),
-  })}\n`);
+  };
+  // agy runs with --output-format stream-json, which wraps the final envelope.
+  process.stdout.write(`${JSON.stringify({ event: "init", conversation_id: "agy-session-1" })}\n`);
+  process.stdout.write(`${JSON.stringify(args.includes("stream-json") ? { event: "result", result: envelope } : envelope)}\n`);
 }
 
 if (process.env.MOCK_EXIT_CODE) process.exitCode = Number(process.env.MOCK_EXIT_CODE);

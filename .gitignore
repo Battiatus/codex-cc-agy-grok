@@ -1,1 +1,12 @@
-.agents
+# Agent tool state: generated per session, never source.
+.agents/*
+!.agents/plugins/
+.agents/plugins/*
+!.agents/plugins/marketplace.json
+.oma/
+.omc/
+.omo/
+.codegraph/
+.superpowers/
+graphify-out/
+node_modules/

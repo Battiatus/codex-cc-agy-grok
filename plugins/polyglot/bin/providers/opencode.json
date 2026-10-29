@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 2,
+  "id": "opencode",
+  "displayName": "OpenCode Connector",
+  "binary": "opencode",
+  "resultAdapter": "opencode",
+  "versionArgs": [
+    "--version"
+  ],
+  "helpProbes": [
+    [
+      "run",
+      "--help"
+    ]
+  ],
+  "knownHiddenFlags": [],
+  "authProbe": null,
+  "installHint": "Install OpenCode CLI",
+  "effortValues": [
+    "minimal",
+    "low",
+    "medium",
+    "high",
+    "max"
+  ],
+  "capabilities": {
+    "structuredOutput": "prompt",
+    "model": true,
+    "effort": true,
+    "resume": true,
+    "budgetUsd": false,
+    "finalMessageFile": false,
+    "readOnlyEnforcement": "permission-env"
+  },
+  "invocation": {
+    "promptVia": "stdin",
+    "baseArgs": [
+      "run",
+      "--format",
+      "json",
+      "--dir",
+      "{cwd}"
+    ],
+    "reviewArgs": [],
+    "writeArgs": [],
+    "reviewEnv": {
+      "OPENCODE_PERMISSION": "{\"edit\":\"deny\",\"bash\":\"deny\"}"
+    },
+    "resumeExtraArgs": [
+      "--session",
+      "{session}"
+    ],
+    "modelArgs": [
+      "--model",
+      "{model}"
+    ],
+    "effortArgs": [
+      "--variant",
+      "{effort}"
+    ],
+    "schemaArgs": [],
+    "finalMessageArgs": [],
+    "budgetArgs": [],
+    "promptArgs": []
+  }
+}
